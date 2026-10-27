@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "readiness_path": "/ready",
+  "liveness_path": "/health",
+  "signing_key_binding": "Ed25519 public key",
+  "kubernetes_credentials": false
+}

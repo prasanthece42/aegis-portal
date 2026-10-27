@@ -30,6 +30,8 @@ class GitHub(DeliveryGitHub):
         if not isinstance(self.private_key, rsa.RSAPrivateKey):
             raise ValueError("GitHub App requires an RSA private key")
         self.client_secret = os.environ["AEGIS_GITHUB_CLIENT_SECRET"]
+        if not self.client_secret.strip():
+            raise ValueError("GitHub App OAuth client secret must be nonempty")
         self.tokens: dict[tuple, tuple[str, float]] = {}
         self.lock = threading.RLock()
 
