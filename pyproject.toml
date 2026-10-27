@@ -8,11 +8,11 @@ dependencies = [
   "uvicorn>=0.30,<1",
   "httpx>=0.28,<1",
   "cryptography>=44,<50",
-  "aegis-platform==0.4.0",
+  "aegis-platform==0.4.1",
 ]
 
 [tool.uv.sources]
-aegis-platform = { path = "vendor/aegis_platform-0.4.0-py3-none-any.whl" }
+aegis-platform = { path = "vendor/aegis_platform-0.4.1-py3-none-any.whl" }
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1"]

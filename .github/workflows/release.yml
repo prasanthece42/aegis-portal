@@ -16,6 +16,6 @@ concurrency:
 
 jobs:
   validate:
-    uses: prasanthece42/aegis-platform/.github/workflows/python-web-release.yml@49b631dc305692e5b709e285d43a22da80aa3bf3
+    uses: prasanthece42/aegis-platform/.github/workflows/python-web-release.yml@b4f46baa41dc250a88c86f63ecb0949d5f14af02
     with:
       app-id: aegis-portal

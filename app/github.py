@@ -208,7 +208,9 @@ class GitHub(DeliveryGitHub):
         ).json()["sha"]
         return result
 
-    def file(self, repository: str, path: str, ref: str, token: str) -> bytes | None:
+    def file(
+        self, repository: str, path: str, ref: str, token: str, *, max_size=32768
+    ) -> bytes | None:
         response = self.api(
             "GET",
             f"/repos/{repository}/contents/{quote(path, safe='/')}",
@@ -219,7 +221,11 @@ class GitHub(DeliveryGitHub):
         if response.status_code == 404:
             return None
         data = response.json()
-        if not isinstance(data, dict) or data.get("type") != "file" or data.get("size", 0) > 32768:
+        if (
+            not isinstance(data, dict)
+            or data.get("type") != "file"
+            or data.get("size", 0) > max_size
+        ):
             raise PortalError(
                 422, "FILE_UNSUPPORTED", "Detected configuration file exceeds supported bounds."
             )
@@ -239,7 +245,7 @@ class GitHub(DeliveryGitHub):
             "uv.lock",
             ".github/workflows/ci.yml",
         ]
-        files = {path: self.file(repo, path, sha, token) for path in paths}
+        files = {path: self.file(repo, path, sha, token, max_size=262144) for path in paths}
         return {
             "source_commit": sha,
             "dockerfile_present": files["Dockerfile"] is not None,
