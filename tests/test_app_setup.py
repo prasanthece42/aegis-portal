@@ -10,7 +10,7 @@ from tooling.setup_github_app import manifest, store_credentials, write_private
 def test_manifest_keeps_app_private_and_has_no_cluster_or_administration_authority():
     data = manifest("https://localhost:8443", "http://127.0.0.1:8765/callback")
     assert data["public"] is False
-    assert data["hook_attributes"]["active"] is False
+    assert "hook_attributes" not in data
     assert data["callback_urls"] == ["https://localhost:8443/auth/github/callback"]
     assert "administration" not in data["default_permissions"]
     assert data["default_permissions"]["statuses"] == "read"

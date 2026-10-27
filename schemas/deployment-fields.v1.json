@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "app_id": {
+      "maxLength": 40,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "App Id",
+      "type": "string"
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
+    "release_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Release Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "app_id",
+    "environment",
+    "release_id"
+  ],
+  "title": "DeploymentFields",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

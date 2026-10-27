@@ -7,7 +7,6 @@ import httpx
 from aegis_platform.canonical import canonical, digest, strict_json
 from aegis_platform.contracts import CatalogEntry, DesiredState
 from aegis_platform.delivery import (
-    CurrentIntent,
     DeliveryPolicy,
     admit_release,
     authorize,
@@ -85,6 +84,11 @@ class DeliveryGitHub:
         if raw is None:
             raise PortalError(503, "DELIVERY_SETUP_REQUIRED", "Delivery policy is not installed.")
         policy = DeliveryPolicy.model_validate(strict_json(raw))
+        bootstrap = self.file(repo, "policies/bootstrap.json", revision, token)
+        if bootstrap is None or digest(strict_json(bootstrap)) != policy.bootstrap_policy_hash:
+            raise PortalError(
+                503, "POLICY_INVALID", "Resource policy differs from approved delivery policy."
+            )
         if (
             policy.platform_repository_id != self.config.platform_repository_id
             or policy.platform_repository != repo
@@ -191,48 +195,38 @@ class DeliveryGitHub:
         )
 
     def current_intent(self, entry, environment, policy):
+        from aegis_platform.proposal import current_state
+
         target = entry.environments[environment]
         repo, token = policy.gitops_repository, self.gitops_token()
+        branch = self.api(
+            "GET", f"/repos/{repo}/commits/{quote(target.gitops_branch, safe='')}", token
+        ).json()["sha"]
         path = target.values_path.rsplit("/", 1)[0] + "/release.json"
-        branch = target.gitops_branch
         raw = self.file(repo, path, branch, token)
         if raw is None:
             return None
-        pointer = strict_json(raw)
-        state = DesiredState.model_validate(pointer["desired_state"])
-        values = self.file(repo, target.values_path, branch, token)
-        # Request workflow writes JSON (valid YAML), avoiding a second YAML parser in the portal.
-        if (
-            pointer["fingerprint"] != digest(state.model_dump())
-            or state.app_id != entry.app_id
-            or state.environment != environment
-            or state.cluster_uid != target.cluster_uid
-            or state.cluster_id != target.cluster_id
-            or state.namespace != target.namespace
-            or state.source_repository_id != entry.source.repository_id
-            or state.chart_version != entry.versions.chart_version
-            or state.chart_sha256 != entry.versions.chart_sha256
-            or values is None
-            or strict_json(values) != state.effective_values
-        ):
+        try:
+            state = DesiredState.model_validate(strict_json(raw)["desired_state"])
+            files = {
+                path: raw,
+                target.values_path: self.file(repo, target.values_path, branch, token),
+            }
+            for binding in state.controller_bindings:
+                files[binding] = self.file(repo, binding, branch, token)
+            commits = self.api(
+                "GET",
+                f"/repos/{repo}/commits",
+                token,
+                params={"sha": branch, "path": path, "per_page": 1},
+            ).json()
+            return current_state(
+                entry, environment, files, commits[0]["sha"], digest(policy.model_dump())
+            )
+        except (ValueError, KeyError, TypeError, IndexError) as exc:
             raise PortalError(
                 409, "DESIRED_STATE_INVALID", "Current app bindings need reconciliation."
-            )
-        commits = self.api(
-            "GET",
-            f"/repos/{repo}/commits",
-            token,
-            params={"sha": branch, "path": path, "per_page": 1},
-        ).json()
-        if not commits:
-            raise PortalError(409, "DESIRED_STATE_INVALID", "Intent anchor is missing.")
-        return CurrentIntent(
-            fingerprint=pointer["fingerprint"],
-            intent_anchor=commits[0]["sha"],
-            source_commit=state.source_commit,
-            image_root_digest=state.image_root_digest,
-            release_id=str(pointer["release_id"]),
-        )
+            ) from exc
 
     def delivery_context(self, session, fields):
         entry, revision, policy = self.delivery_authorize(

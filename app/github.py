@@ -172,6 +172,11 @@ class GitHub(DeliveryGitHub):
                 f"/user/installations/{iid}/repositories", session.user_token, "repositories"
             )
             for repo in repos:
+                if str(repo["id"]) in {
+                    self.config.platform_repository_id,
+                    self.config.gitops_repository_id,
+                }:
+                    continue
                 if repo["private"] or not repo.get("permissions", {}).get("push"):
                     continue
                 result.append(

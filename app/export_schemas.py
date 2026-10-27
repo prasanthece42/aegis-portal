@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from aegis_platform.delivery import DeploymentFields, DeploymentSubmission
+
 from app.contracts import (
     CatalogEntry,
     DeploymentIntent,
@@ -20,6 +22,8 @@ def export(directory: Path):
         (DesiredState, "desired-state.v1.json"),
         (RegistrationFields, "registration-fields.v1.json"),
         (RegistrationSubmission, "registration-submission.v1.json"),
+        (DeploymentFields, "deployment-fields.v1.json"),
+        (DeploymentSubmission, "deployment-submission.v1.json"),
     ]:
         schema = model.model_json_schema()
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"

@@ -119,7 +119,7 @@ def create_app(
         if backend:
             backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.2.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.add_middleware(RequestBoundary)
@@ -240,7 +240,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.1.0",
+            "version": "0.2.0",
         }
 
     @app.get("/auth/github/start")

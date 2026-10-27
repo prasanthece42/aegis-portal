@@ -38,7 +38,6 @@ def manifest(origin: str, callback: str) -> dict:
         "description": "Authorized Aegis catalog and delivery requests; GitOps and Argo deploy.",
         "redirect_url": callback,
         "callback_urls": [origin + "/auth/github/callback"],
-        "hook_attributes": {"url": origin + "/github/events", "active": False},
         "public": False,
         "request_oauth_on_install": False,
         "default_events": [],
