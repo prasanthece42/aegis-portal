@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from copy import deepcopy
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import LiveConfig
@@ -94,6 +95,46 @@ class DemoBackend:
 
     def catalog(self) -> list[dict]:
         return []
+
+    def owner_allowed(self, session):
+        return session.user_id == "1"  # Explicit synthetic role; never a live grant.
+
+    def owner_overview(self, session):
+        if not self.owner_allowed(session):
+            raise PortalError(403, "PLATFORM_FORBIDDEN", "Platform owner access is required.")
+        return {
+            "mode": "demo",
+            "access_mode": "read_only",
+            "observed_at": datetime.now(UTC).isoformat(),
+            "catalog_revision": None,
+            "applications": [],
+            "reviews": [],
+            "review_total": 0,
+            "activity": [],
+            "activity_total": 0,
+            "clusters": [
+                {
+                    "cluster_id": "example-kind",
+                    "cluster_uid": "demo-only",
+                    "profile_id": "small",
+                    "state": "demo_only",
+                }
+            ],
+            "policy": {
+                "production_human_review_required": True,
+                "protected_sync_mode": "operator",
+                "maximum_evidence_age_seconds": 86400,
+                "owner_user_ids": ["1"],
+                "resource_profiles": {
+                    "small": {
+                        "requests": {"cpu": "100m", "memory": "128Mi"},
+                        "limits": {"cpu": "500m", "memory": "256Mi"},
+                    }
+                },
+                "owner_policy_url": None,
+                "delivery_policy_url": None,
+            },
+        }
 
     def journal(self, registration_id: str) -> tuple[str, dict] | None:
         with self.lock:
