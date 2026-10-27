@@ -16,8 +16,9 @@
       <nav aria-label="Main navigation">
         <button class="nav-item active" id="nav-apps"><span aria-hidden="true">▦</span> Applications</button>
         <button class="nav-item" id="nav-register"><span aria-hidden="true">＋</span> Register application</button>
+        <button class="nav-item" id="nav-platform" hidden><span aria-hidden="true">⚙</span> Platform owner</button>
       </nav>
-      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.1</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
+      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.3</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
     </aside>
     <div class="workspace">
       <header class="topbar"><span>Workspace <span class="crumb">/</span> Application platform</span><div id="identity">Not signed in</div></header>
@@ -42,6 +43,23 @@
           <div id="pending-recovery" class="notice" hidden><p>A previous submission was interrupted. Recover it with the same request key.</p><button class="secondary" id="recover-registration">Recover registration</button></div>
           <div id="registration-list"></div>
           <div class="empty card" id="empty-state"><div class="empty-icon" aria-hidden="true">＋</div><h2>Your next application starts here.</h2><p>Choose a GitHub repository and submit its configuration for platform review.</p><button class="secondary" id="empty-register">Register your first application</button></div>
+        </section>
+        <section id="platform" hidden>
+          <div class="page-heading"><div><span class="eyebrow">PLATFORM OWNER</span><h1>Platform overview</h1><p>Inventory, review queues and verified request activity.</p></div><button class="secondary" id="refresh-platform">Refresh overview ↻</button></div>
+          <div class="notice owner-notice"><strong>Reviewed changes. Clear ownership.</strong><p>Approvals and configuration changes follow GitHub review. PROD requires independent human approval and authorized operator sync.</p></div>
+          <p class="muted" id="platform-observed" role="status">Loading reviewed platform data…</p>
+          <div class="owner-tabs" role="tablist" aria-label="Platform owner views">
+            <button id="owner-tab-overview" role="tab" aria-selected="true" aria-controls="owner-overview" data-owner-tab="overview">Overview</button>
+            <button id="owner-tab-reviews" role="tab" aria-selected="false" aria-controls="owner-reviews" data-owner-tab="reviews">Reviews</button>
+            <button id="owner-tab-applications" role="tab" aria-selected="false" aria-controls="owner-applications" data-owner-tab="applications">Applications</button>
+            <button id="owner-tab-policy" role="tab" aria-selected="false" aria-controls="owner-policy" data-owner-tab="policy">Clusters & policy</button>
+            <button id="owner-tab-activity" role="tab" aria-selected="false" aria-controls="owner-activity" data-owner-tab="activity">Activity</button>
+          </div>
+          <section id="owner-overview" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-overview"><div id="owner-summary" class="owner-metrics"></div><div class="owner-grid"><div class="card form-card"><h2>Delivery safeguards</h2><div id="owner-safeguards"></div></div><div class="card form-card"><h2>Platform access</h2><div id="owner-access"></div></div></div></section>
+          <section id="owner-reviews" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-reviews" hidden><div class="section-label"><h2>Repository reviews</h2><span class="muted" id="owner-review-count"></span></div><p class="muted">Check summaries describe reported CI results. GitHub enforces the final branch review and merge requirements.</p><div id="owner-review-list"></div></section>
+          <section id="owner-applications" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-applications" hidden><div class="section-label"><h2>Managed application inventory</h2></div><p class="muted">Health comes from trusted, matching observer evidence. Missing or stale observations do not count as Healthy.</p><div id="owner-application-list"></div></section>
+          <section id="owner-policy" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-policy" hidden><div class="section-label"><h2>Cluster enrollment</h2></div><p class="muted">Enrollment records identify approved targets. This console does not query Kubernetes node readiness.</p><div id="owner-cluster-list" class="owner-grid"></div><div class="section-label"><h2>Resource profiles</h2></div><div id="owner-profile-list" class="owner-grid"></div><div id="owner-policy-links" class="owner-links"></div></section>
+          <section id="owner-activity" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-activity" hidden><div class="section-label"><h2>Signed request activity</h2><span class="muted" id="owner-activity-count"></span></div><p class="muted">A verified historical signature establishes request authenticity, not current deployment health or fresh admission authority.</p><div id="owner-activity-list"></div></section>
         </section>
         <section id="registration" hidden>
           <div class="page-heading"><div><span class="eyebrow">APPLICATION ONBOARDING</span><h1>Register application</h1><p>A few settings. One reviewed configuration.</p></div><span class="pill neutral">DEV first</span></div>

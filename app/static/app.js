@@ -1,7 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
-const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress"];
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform"];
 
 function node(tag, text, cls) {
   const element = document.createElement(tag);
@@ -14,6 +14,8 @@ function show(name) {
   $("error").hidden = true;
   $("nav-apps").classList.toggle("active", name === "applications" || name === "progress");
   $("nav-register").classList.toggle("active", name === "registration");
+  $("nav-platform").classList.toggle("active", name === "platform");
+  if (name !== "platform" && window.location.hash === "#platform") history.replaceState(null, "", window.location.pathname);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function error(message) {
@@ -53,6 +55,7 @@ async function action(callback) {
   }
 }
 function renderIdentity() {
+  $("nav-platform").hidden = !state.session?.allowed_actions?.includes("platform:view");
   $("identity").replaceChildren();
   if (!state.session) { $("identity").textContent = "Not signed in"; return; }
   $("identity").append(node("span", state.session.login));
@@ -341,6 +344,98 @@ $("sign-in-button").addEventListener("click", () => action(async () => {
     await api("/auth/demo", { method: "POST" }); await loadSession(); await applications();
   } else if (state.status.mode === "live") window.location.assign("/auth/github/start");
 }));
+function ownerLink(label, address) {
+  if (!address) return node("span", "Available with live integration", "muted");
+  let url;
+  try { url = new URL(address); } catch { return node("span", "Link unavailable", "muted"); }
+  if (url.origin !== "https://github.com") return node("span", "Link unavailable", "muted");
+  const link = node("a", label, "owner-link");
+  link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+  return link;
+}
+function ownerTab(name) {
+  for (const button of document.querySelectorAll("[data-owner-tab]")) {
+    const selected = button.dataset.ownerTab === name;
+    button.setAttribute("aria-selected", String(selected));
+    $("owner-" + button.dataset.ownerTab).hidden = !selected;
+  }
+}
+function ownerEmpty(target, text) { target.append(node("p", text, "notice")); }
+function ownerCheck(target, label, value) {
+  const row = node("div", undefined, "check-row");
+  row.append(node("strong", label), node("span", value)); target.append(row);
+}
+async function platformOverview() {
+  if (!state.session?.allowed_actions?.includes("platform:view")) throw new Error("Platform owner access is required.");
+  show("platform"); ownerTab("overview"); window.location.hash = "platform";
+  for (const id of ["owner-summary", "owner-safeguards", "owner-access", "owner-review-list", "owner-application-list", "owner-cluster-list", "owner-profile-list", "owner-policy-links", "owner-activity-list"]) $(id).replaceChildren();
+  $("platform-observed").textContent = "Loading reviewed platform data…";
+  const data = await api("/api/v1/platform/overview");
+  $("platform-observed").textContent = `${data.mode === "demo" ? "DEMO · No live GitHub or cluster data. " : ""}Snapshot observed ${new Date(data.observed_at).toLocaleString()}`;
+  const environments = data.applications.flatMap((app) => app.environments);
+  for (const [label, value, note] of [["Managed applications", data.applications.length, "Approved catalog"], ["Healthy environments", environments.filter((env) => env.state === "healthy").length, "Fresh observer evidence"], ["Open reviews", data.review_total, "Platform + GitOps"], ["Cluster enrollments", data.clusters.length, "Configured targets"]]) {
+    const card = node("div", undefined, "card owner-metric");
+    card.append(node("span", label, "muted"), node("strong", String(value)), node("small", note)); $("owner-summary").append(card);
+  }
+  ownerCheck($("owner-safeguards"), "PROD human approval", data.policy.production_human_review_required ? "Required" : "Not configured");
+  ownerCheck($("owner-safeguards"), "Protected sync", "Authorized " + data.policy.protected_sync_mode);
+  ownerCheck($("owner-safeguards"), "Health freshness", "Healthy only with a matching observation within 5 minutes");
+  ownerCheck($("owner-access"), "Signed-in owner", state.session.login);
+  ownerCheck($("owner-access"), "Console access", "Read-only · Explicit platform grant");
+  ownerCheck($("owner-access"), "Configuration changes", "Reviewed GitHub pull requests");
+  $("owner-access").append(ownerLink("Review owner policy ↗", data.policy.owner_policy_url));
+  $("owner-review-count").textContent = `Showing ${data.reviews.length} of ${data.review_total}`;
+  const checkLabels = { failing: "Checks failing", running: "Checks running", reported_passed: "Reported checks passed", unknown: "Checks not reported" };
+  for (const review of data.reviews) {
+    const row = node("article", undefined, "card registration-row"); const content = node("div");
+    content.append(node("h3", review.title), node("p", `${review.repository} #${review.number} · ${review.branch} · ${review.draft ? "Draft" : "Open"}`));
+    const actions = node("div", undefined, "row-action"); actions.append(node("span", checkLabels[review.ci_state] || "Unknown", "pill " + (review.ci_state === "failing" ? "owner-warning" : "neutral")), ownerLink("Review in GitHub ↗", review.url));
+    row.append(content, actions); $("owner-review-list").append(row);
+  }
+  if (!data.reviews.length) ownerEmpty($("owner-review-list"), "No open repository reviews.");
+  const healthLabels = { healthy: "Observer verified", stale: "Stale observation", unverified: "Health not verified", not_deployed: "Not deployed" };
+  for (const app of data.applications) {
+    const card = node("article", undefined, "card form-card owner-app-card");
+    const heading = node("div", undefined, "section-label"); heading.append(node("h2", app.display_name), ownerLink("Source ↗", app.source_url)); card.append(heading);
+    card.append(node("p", `${app.source} · Owners: ${app.owner_user_ids.map((id) => id === state.session.user_id ? "You" : "GitHub user " + id).join(", ")}`, "muted"));
+    for (const env of app.environments) {
+      const row = node("div", undefined, "owner-env"); const content = node("div");
+      content.append(node("strong", `${env.environment.toUpperCase()} · ${env.namespace}`), node("small", `${env.cluster_id} · Argo ${env.argo_application}`));
+      if (env.image_digest) content.append(node("p", env.image_digest, "mono"));
+      if (env.health_observed_at) content.append(node("small", "Health measured " + new Date(env.health_observed_at).toLocaleString()));
+      const actions = node("div", undefined, "row-action");
+      actions.append(node("span", healthLabels[env.state] || "Unavailable", "pill " + (env.state === "healthy" ? "" : "neutral")));
+      if (env.values_url) actions.append(ownerLink("View desired state ↗", env.values_url));
+      row.append(content, actions); card.append(row);
+    }
+    $("owner-application-list").append(card);
+  }
+  if (!data.applications.length) ownerEmpty($("owner-application-list"), "No approved applications are enrolled.");
+  for (const cluster of data.clusters) {
+    const card = node("article", undefined, "card form-card");
+    card.append(node("h3", cluster.cluster_id), node("span", cluster.state === "enrolled" ? "Enrolled" : "Demo example", "pill neutral"), node("p", "Profile: " + cluster.profile_id), node("small", "Cluster UID"), node("p", cluster.cluster_uid, "mono")); $("owner-cluster-list").append(card);
+  }
+  for (const [name, profile] of Object.entries(data.policy.resource_profiles)) {
+    const card = node("article", undefined, "card form-card"); card.append(node("h3", name));
+    ownerCheck(card, "Requests", `${profile.requests.cpu} CPU · ${profile.requests.memory}`);
+    ownerCheck(card, "Limits", `${profile.limits.cpu} CPU · ${profile.limits.memory}`); $("owner-profile-list").append(card);
+  }
+  $("owner-policy-links").append(ownerLink("Review delivery policy ↗", data.policy.delivery_policy_url), ownerLink("Review owner access ↗", data.policy.owner_policy_url));
+  $("owner-activity-count").textContent = `Showing ${data.activity.length} of ${data.activity_total}`;
+  for (const item of data.activity) {
+    const row = node("article", undefined, "card registration-row"); const content = node("div");
+    if (item.integrity === "verified") {
+      content.append(node("h3", `${item.app_id} · ${item.environment.toUpperCase()}`), node("p", "Requested " + new Date(item.created_at).toLocaleString()), node("p", `Release ${item.release_id} · Requester GitHub user ${item.requester_user_id}`, "muted"), node("p", item.request_id, "mono"));
+    } else content.append(node("h3", "Unverified or duplicate request record"), node("p", `Issue #${item.issue_number} · Inspect the original evidence`, "muted"));
+    const actions = node("div", undefined, "row-action"); actions.append(node("span", item.integrity === "verified" ? (item.issuer_active ? "Signature verified" : "Historical issuer") : "Integrity needs review", "pill neutral"), ownerLink("Inspect request ↗", item.url));
+    row.append(content, actions); $("owner-activity-list").append(row);
+  }
+  if (!data.activity.length) ownerEmpty($("owner-activity-list"), "No signed delivery request activity is available.");
+}
+$("nav-platform").addEventListener("click", () => action(platformOverview));
+$("refresh-platform").addEventListener("click", () => action(platformOverview));
+for (const button of document.querySelectorAll("[data-owner-tab]")) button.addEventListener("click", () => ownerTab(button.dataset.ownerTab));
+
 action(async () => {
   state.status = await api("/api/v1/status");
   if (state.status.mode === "demo") {
@@ -356,7 +451,7 @@ action(async () => {
     $("sign-in-button").textContent = "GitHub App setup required"; $("sign-in-button").disabled = true;
   }
   if (state.status.registration_enabled) {
-    try { await loadSession(); await applications(); }
+    try { const ownerRequested = window.location.hash === "#platform"; await loadSession(); if (ownerRequested && state.session.allowed_actions.includes("platform:view")) await platformOverview(); else await applications(); }
     catch (e) {
       show(state.session ? "applications" : "sign-in");
       if (state.session) error(e.message);

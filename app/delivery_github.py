@@ -285,14 +285,17 @@ class DeliveryGitHub:
                     )
         return result
 
-    def current_intent(self, entry, environment, policy):
+    def current_intent(self, entry, environment, policy, *, revision=None):
         from aegis_platform.proposal import current_state
 
         target = entry.environments[environment]
         repo, token = policy.gitops_repository, self.gitops_token()
-        branch = self.api(
-            "GET", f"/repos/{repo}/commits/{quote(target.gitops_branch, safe='')}", token
-        ).json()["sha"]
+        branch = (
+            revision
+            or self.api(
+                "GET", f"/repos/{repo}/commits/{quote(target.gitops_branch, safe='')}", token
+            ).json()["sha"]
+        )
         path = target.values_path.rsplit("/", 1)[0] + "/release.json"
         raw = self.file(repo, path, branch, token)
         if raw is None:

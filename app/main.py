@@ -129,7 +129,7 @@ def create_app(
         if backend:
             backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.3.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.add_middleware(RequestBoundary)
@@ -251,7 +251,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.2.0",
+            "version": "0.3.0",
         }
 
     @app.get("/auth/github/start")
@@ -337,16 +337,30 @@ def create_app(
 
     @app.get("/api/v1/session")
     def get_session(session: Auth):
+        actions = ["register"] if session.user_id in config.onboarding_user_ids else []
+        owner_status = "not_granted"
+        if hasattr(backend, "owner_allowed"):
+            try:
+                if backend.owner_allowed(session):
+                    actions.append("platform:view")
+                    owner_status = "granted"
+            except PortalError:
+                owner_status = "unavailable"
         return {
             "user_id": session.user_id,
             "login": session.login,
             "csrf_token": session.csrf,
-            "allowed_actions": ["register"]
-            if session.user_id in config.onboarding_user_ids
-            else [],
+            "allowed_actions": actions,
+            "platform_owner_status": owner_status,
             "owner_choices": [{"user_id": session.user_id, "label": session.login}],
             "resource_profiles": config.model_dump()["resource_profiles"],
         }
+
+    @app.get("/api/v1/platform/overview")
+    def platform_overview(session: Auth):
+        if not hasattr(backend, "owner_overview"):
+            raise PortalError(403, "PLATFORM_FORBIDDEN", "Platform owner access is not enabled.")
+        return backend.owner_overview(session)
 
     @app.get("/api/v1/repositories")
     def repositories(session: Auth):

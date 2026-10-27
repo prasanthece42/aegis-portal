@@ -14,11 +14,46 @@ Argo Synced/Healthy. The sample application's three environments retained their 
 pods and images. The generic managed `aegis-portal-dev` deployment validates application
 releases; it receives no portal credentials.
 
-The configured front door currently runs with operator-private local credentials.
-The operator-owned Kubernetes runtime/gateway tooling is provided for the next reviewed
-installation into `aegis-portal-system`. Publishing this source does not install that
-runtime. Legacy sample catalog enrollment, protected-target integration and rollback
-remain separate work.
+The configured front door runs in `aegis-portal-system` behind a local HTTPS gateway.
+The separately registered `hello-aegis` application has also completed DEV onboarding,
+release publication, signed delivery, GitOps checks and Argo rollout. Publishing new
+portal source does not update the configured runtime: its immutable release and exact
+system plan require independent review. Legacy sample catalog enrollment,
+protected-target integration and rollback remain separate work.
+
+## Platform owner console
+
+Version 0.3.0 adds **Platform owner** navigation and `/#platform`, with Overview,
+Reviews, Applications, Clusters & policy, and Activity views. The console is read-only;
+review links open GitHub. Catalog and configuration changes follow protected PR review.
+PROD retains independent human approval and authorized operator sync.
+
+Owner access is a separate grant in the platform repository's reviewed main branch:
+
+```json
+{
+  "schema_version": 1,
+  "platform_repository_id": "900",
+  "mode": "read_only",
+  "owner_user_ids": ["123"]
+}
+```
+
+Save this policy as `policies/portal-owner.json` with the actual numeric repository and
+GitHub user IDs. Application owner/deployer grants do not confer platform access.
+An absent policy or empty owner list disables access; each owner request rechecks the
+current policy, so revocation does not depend on signing out. Invalid/unavailable policy
+denies owner access while preserving an otherwise valid developer session.
+
+`GET /api/v1/platform/overview` uses permission-reduced, repository-scoped App tokens.
+Catalog files share one platform revision; desired state uses resolved GitOps revisions.
+Cluster enrollment is inventory, not node readiness. Healthy environments require a
+matching trusted observer measurement within five minutes; stale/invalid evidence is
+labelled accordingly. Review CI summaries report provider results, not branch-protection
+approval. Historical request activity verifies signatures and authorship, including
+inactive issuers; it does not establish fresh admission or current deployment health.
+Review/activity rows are capped at 20 per source with totals shown. Demo owner access
+is explicitly synthetic and loads no live GitHub or Kubernetes data.
 
 ## Run a local walkthrough
 
@@ -42,7 +77,7 @@ fail closed. There is no fallback to demo authentication.
 
 `examples/live-config.json` is illustrative. An operator supplies reviewed real repository,
 App/installation, cluster, workflow, profile and issuer bindings. Shared public contracts
-come from the hash-pinned `aegis-platform==0.4.4` wheel in `vendor/`; this repository builds
+come from the hash-pinned `aegis-platform==0.4.5` wheel in `vendor/`; this repository builds
 without a sibling checkout. The source manifest describes a local snapshot, not a signed
 package release.
 
@@ -131,5 +166,8 @@ workflow publishes tested amd64/arm64 images and complete retained OCI evidence.
 
 Optional `tests/browser-smoke.cjs` uses separately installed Playwright against a fresh
 local demo, checks desktop/mobile registration and lost-response recovery, and writes
-ignored screenshots under `.local/qa/`. It never uses live OAuth credentials. Design
+ignored screenshots under `.local/qa/`. It never uses live OAuth credentials.
+`tests/owner-browser-smoke.cjs` checks all owner views, desktop/mobile layouts, deep links,
+escaped review titles and logout against an isolated demo with labelled illustrative rows.
+It writes ignored screenshots under `.local/owner-qa/`. Design
 references are in the sibling sample repository's `DOCS/22`–`28` documents.
