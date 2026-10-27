@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "Runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "const": "python312-web",
+          "default": "python312-web",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "container_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Container Port",
+          "type": "integer"
+        },
+        "health_path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Health Path",
+          "type": "string"
+        },
+        "resource_profile_id": {
+          "pattern": "^[a-z][a-z0-9-]{0,39}$",
+          "title": "Resource Profile Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "container_port",
+        "health_path",
+        "resource_profile_id"
+      ],
+      "title": "Runtime",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Repository Id",
+      "type": "string"
+    },
+    "app_id": {
+      "maxLength": 40,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "App Id",
+      "type": "string"
+    },
+    "display_name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Display Name",
+      "type": "string"
+    },
+    "owner_user_ids": {
+      "items": {
+        "maxLength": 24,
+        "pattern": "^[1-9][0-9]*$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Owner User Ids",
+      "type": "array"
+    },
+    "runtime": {
+      "$ref": "#/$defs/Runtime"
+    },
+    "review_token": {
+      "maxLength": 16384,
+      "minLength": 20,
+      "title": "Review Token",
+      "type": "string"
+    }
+  },
+  "required": [
+    "repository_id",
+    "app_id",
+    "display_name",
+    "owner_user_ids",
+    "runtime",
+    "review_token"
+  ],
+  "title": "RegistrationSubmission",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,235 @@
+{
+  "$defs": {
+    "PriorEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "enum": [
+            "dev",
+            "staging"
+          ],
+          "title": "Environment",
+          "type": "string"
+        },
+        "intent_anchor": {
+          "title": "Intent Anchor",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "evidence_reference": {
+          "title": "Evidence Reference",
+          "type": "string"
+        }
+      },
+      "required": [
+        "environment",
+        "intent_anchor",
+        "fingerprint",
+        "observed_at",
+        "evidence_reference"
+      ],
+      "title": "PriorEvidence",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "request_id": {
+      "pattern": "^req-[0-9a-f]{64}$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "issuer_id": {
+      "title": "Issuer Id",
+      "type": "string"
+    },
+    "platform_repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Platform Repository Id",
+      "type": "string"
+    },
+    "requester_user_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Requester User Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "idempotency_key_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Idempotency Key Hash",
+      "type": "string"
+    },
+    "payload_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Payload Hash",
+      "type": "string"
+    },
+    "app_id": {
+      "maxLength": 40,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "App Id",
+      "type": "string"
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
+    "operation": {
+      "enum": [
+        "deploy",
+        "promote"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "origin": {
+      "const": "portal",
+      "title": "Origin",
+      "type": "string"
+    },
+    "catalog_revision": {
+      "pattern": "^[0-9a-f]{40}$",
+      "title": "Catalog Revision",
+      "type": "string"
+    },
+    "catalog_entry_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Catalog Entry Hash",
+      "type": "string"
+    },
+    "resolved_policy_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Resolved Policy Hash",
+      "type": "string"
+    },
+    "source_repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Source Repository Id",
+      "type": "string"
+    },
+    "source_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "title": "Source Commit",
+      "type": "string"
+    },
+    "release_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Release Id",
+      "type": "string"
+    },
+    "release_workflow_run_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Release Workflow Run Id",
+      "type": "string"
+    },
+    "release_evidence_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Release Evidence Hash",
+      "type": "string"
+    },
+    "image_root_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Image Root Digest",
+      "type": "string"
+    },
+    "platform_digests": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "Platform Digests",
+      "type": "object"
+    },
+    "expected_desired_fingerprint": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expected Desired Fingerprint"
+    },
+    "expected_intent_anchor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expected Intent Anchor"
+    },
+    "prior_environment_evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PriorEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "request_id",
+    "issuer_id",
+    "platform_repository_id",
+    "requester_user_id",
+    "created_at",
+    "idempotency_key_hash",
+    "payload_hash",
+    "app_id",
+    "environment",
+    "operation",
+    "origin",
+    "catalog_revision",
+    "catalog_entry_hash",
+    "resolved_policy_hash",
+    "source_repository_id",
+    "source_commit",
+    "release_id",
+    "release_workflow_run_id",
+    "release_evidence_hash",
+    "image_root_digest",
+    "platform_digests",
+    "expected_desired_fingerprint",
+    "expected_intent_anchor",
+    "prior_environment_evidence"
+  ],
+  "title": "DeploymentIntent",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

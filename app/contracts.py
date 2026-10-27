@@ -1,0 +1,41 @@
+"""Compatibility imports: contracts are owned by the versioned platform package."""
+
+from aegis_platform.contracts import (
+    Access,
+    AppId,
+    CatalogEntry,
+    Commit,
+    Contract,
+    DeploymentIntent,
+    DesiredState,
+    Digest,
+    Environment,
+    Identifier,
+    PriorEvidence,
+    RegistrationFields,
+    RegistrationSubmission,
+    Runtime,
+    Source,
+    Target,
+    Versions,
+)
+
+__all__ = [
+    "Access",
+    "AppId",
+    "CatalogEntry",
+    "Commit",
+    "Contract",
+    "DeploymentIntent",
+    "DesiredState",
+    "Digest",
+    "Environment",
+    "Identifier",
+    "PriorEvidence",
+    "RegistrationFields",
+    "RegistrationSubmission",
+    "Runtime",
+    "Source",
+    "Target",
+    "Versions",
+]

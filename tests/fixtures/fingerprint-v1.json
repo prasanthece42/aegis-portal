@@ -1,0 +1,35 @@
+{
+  "input": {
+    "schema_version": 1,
+    "app_id": "orders-api",
+    "environment": "dev",
+    "cluster_id": "kind-local",
+    "cluster_uid": "fixture-cluster-uid",
+    "namespace": "aegis-orders-api-dev",
+    "source_repository_id": "101",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_root_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "platform_digests": {
+      "linux/arm64": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "chart_version": "1.0.0",
+    "chart_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "effective_values": {
+      "replicaCount": 1,
+      "service": {
+        "port": 8000
+      },
+      "healthPath": "/health"
+    },
+    "resolved_cluster_profile": {
+      "runtime": "kind",
+      "resourceProfile": "small"
+    },
+    "controller_bindings": {
+      "application": "orders-api-dev",
+      "project": "orders-api",
+      "branch": "main"
+    }
+  },
+  "expected_fingerprint": "sha256:1e8f80aa864c99f26cfe50a4f0595458eda4ad1a56ab99514b1ce73eecd521a5"
+}

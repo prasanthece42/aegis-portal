@@ -1,0 +1,338 @@
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress"];
+
+function node(tag, text, cls) {
+  const element = document.createElement(tag);
+  if (text !== undefined) element.textContent = text;
+  if (cls) element.className = cls;
+  return element;
+}
+function show(name) {
+  for (const id of sections) $(id).hidden = id !== name;
+  $("error").hidden = true;
+  $("nav-apps").classList.toggle("active", name === "applications" || name === "progress");
+  $("nav-register").classList.toggle("active", name === "registration");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function error(message) {
+  $("error").textContent = message;
+  $("error").hidden = false;
+  $("error").focus();
+}
+async function api(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (options.body) headers["Content-Type"] = "application/json";
+  if (state.session) headers["X-CSRF-Token"] = state.session.csrf_token;
+  const response = await fetch(path, { credentials: "same-origin", ...options, headers });
+  const data = await response.json();
+  if (!response.ok) {
+    if (response.status === 401 && state.session) {
+      state.session = null;
+      show("sign-in");
+      renderIdentity();
+    }
+    const fields = data.error?.field_errors?.map((e) => `${e.field}: ${e.message}`).join("; ");
+    throw new Error(fields || data.error?.message || "The request could not be completed.");
+  }
+  return data;
+}
+async function action(callback) {
+  if (state.busy) return;
+  state.busy = true;
+  $("error").hidden = true;
+  const buttons = [...document.querySelectorAll("button:not(:disabled)")];
+  buttons.forEach((b) => { b.disabled = true; });
+  try { await callback(); }
+  catch (e) { error(e.message || "Connection interrupted. Retry the same confirmed submission."); }
+  finally {
+    state.busy = false;
+    buttons.forEach((b) => { b.disabled = false; });
+    if (state.status?.mode === "unconfigured") $("sign-in-button").disabled = true;
+  }
+}
+function renderIdentity() {
+  $("identity").replaceChildren();
+  if (!state.session) { $("identity").textContent = "Not signed in"; return; }
+  $("identity").append(node("span", state.session.login));
+  const logout = node("button", "Sign out", "text-button");
+  logout.addEventListener("click", () => action(async () => {
+    await api("/auth/logout", { method: "POST" });
+    state.session = null; renderIdentity(); show("sign-in");
+  }));
+  $("identity").append(logout);
+}
+async function loadSession() {
+  state.session = await api("/api/v1/session");
+  renderIdentity();
+}
+async function applications() {
+  if (!state.session) { show("sign-in"); return; }
+  const data = await api("/api/v1/registrations");
+  const managed = await api("/api/v1/applications");
+  show("applications");
+  $("registration-count").textContent = data.items.length;
+  let pending = null;
+  try { pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration")); } catch { /* corrupt state */ }
+  $("pending-recovery").hidden = !pending || pending.user_id !== state.session.user_id;
+  $("empty-state").hidden = data.items.length > 0;
+  $("registration-list").replaceChildren();
+  $("managed-applications").replaceChildren();
+  state.applications = managed.items;
+  for (const app of managed.items) {
+    const row = node("article", undefined, "card registration-row");
+    const content = node("div");
+    content.append(node("h3", app.display_name), node("p", `${app.source.owner}/${app.source.name} · ${Object.keys(app.environments).join(" / ").toUpperCase()}`));
+    const request = node("button", "Request deployment →", "secondary");
+    request.disabled = !state.status.deployment_enabled;
+    request.addEventListener("click", () => action(() => deployment(app.app_id)));
+    row.append(content, request); $("managed-applications").append(row);
+  }
+  if (!managed.items.length) $("managed-applications").append(node("p", "No approved applications are available to your identity.", "muted"));
+  for (const item of data.items) {
+    const row = node("article", undefined, "card registration-row");
+    const content = node("div");
+    content.append(node("h3", item.display_name), node("p", `${item.app_id} · DEV · Not deployed`));
+    const actions = node("div", undefined, "row-action");
+    const catalogState = item.requirements[0].status;
+    const label = catalogState === "closed_unmerged" ? "Registration closed" : catalogState === "approved" ? "Setup incomplete" : "Onboarding pending";
+    actions.append(node("span", label, "pill neutral"));
+    const view = node("button", "View setup →", "text-button");
+    view.addEventListener("click", () => action(() => progress(item.registration_id)));
+    actions.append(view); row.append(content, actions); $("registration-list").append(row);
+  }
+}
+function profileDescription() {
+  const profile = state.session.resource_profiles[$("resource-profile").value];
+  $("resource-description").textContent = profile ? `Requests: ${profile.cpu_request} CPU / ${profile.memory_request} memory. Limits: ${profile.cpu_limit} CPU / ${profile.memory_limit} memory.` : "";
+}
+async function deployment(appId) {
+  state.deliveryApp = state.applications.find((app) => app.app_id === appId);
+  if (!state.deliveryApp) throw new Error("Application is unavailable.");
+  state.deliveryPreview = null; state.releasePage = 1;
+  $("deployment-title").textContent = `Deploy ${state.deliveryApp.display_name}`;
+  $("deployment-environment").replaceChildren(...Object.keys(state.deliveryApp.environments)
+    .filter((env) => state.deliveryApp.access.deployer_user_ids_by_environment[env]?.includes(state.session.user_id))
+    .map((env) => new Option(env.toUpperCase(), env)));
+  $("deployment-form").hidden = false; $("deployment-review").hidden = true;
+  show("deployment"); await loadReleases();
+}
+async function loadReleases() {
+  const env = $("deployment-environment").value;
+  if (!env) throw new Error("Your identity has no deployment grant for this application.");
+  const data = await api(`/api/v1/applications/${encodeURIComponent(state.deliveryApp.app_id)}/releases?environment=${env}&page=${state.releasePage}`);
+  $("deployment-release").replaceChildren(new Option("Select a validated release", ""));
+  for (const release of data.items) {
+    const option = new Option(`${release.tag} · ${release.eligible ? release.source_commit.slice(0, 12) : "Not eligible"}`, release.release_id);
+    option.disabled = !release.eligible;
+    $("deployment-release").append(option);
+  }
+  state.nextReleasePage = data.next_page; $("more-releases").hidden = !data.next_page;
+  $("deployment-release-note").textContent = "Only source-bound releases from the approved workflows can be selected. Cache and prior-environment health are checked during review.";
+}
+async function previewDeployment() {
+  const fields = { app_id: state.deliveryApp.app_id, environment: $("deployment-environment").value, release_id: $("deployment-release").value };
+  state.deliveryPreview = await api("/api/v1/deployment-validations", { method: "POST", body: JSON.stringify(fields) });
+  const preview = state.deliveryPreview, context = preview.context;
+  $("deployment-review-details").replaceChildren();
+  for (const [label, value] of [["Application", fields.app_id], ["Environment", fields.environment.toUpperCase()],
+    ["Source commit", context.source_commit], ["Immutable image", context.image_root_digest],
+    ["Cluster", context.target.cluster_id], ["Namespace", context.target.namespace],
+    ["Current desired state", context.expected_desired_fingerprint || "Initial deployment"]]) {
+    $("deployment-review-details").append(node("dt", label), node("dd", value));
+  }
+  $("deployment-confirm-note").textContent = preview.requires_human_approval
+    ? "PROD requires independent human approval of the current PR head, then authorized operator sync."
+    : preview.requires_operator_sync ? "The approved GitOps change requires authorized operator sync."
+    : "DEV deploys after GitOps admission and required checks pass. This review expires in five minutes.";
+  $("deployment-form").hidden = true; $("deployment-review").hidden = false;
+}
+async function confirmDeployment() {
+  const preview = state.deliveryPreview;
+  if (!preview) throw new Error("Review the release and target first.");
+  let pending;
+  try { pending = JSON.parse(sessionStorage.getItem("aegis.pending-delivery")); } catch { pending = null; }
+  if (!pending || pending.user_id !== state.session.user_id || JSON.stringify(pending.fields) !== JSON.stringify(preview.fields)) {
+    pending = { user_id: state.session.user_id, fields: preview.fields, key: crypto.randomUUID() };
+    sessionStorage.setItem("aegis.pending-delivery", JSON.stringify(pending));
+  }
+  const result = await api("/api/v1/deployment-requests", { method: "POST", headers: { "Idempotency-Key": pending.key }, body: JSON.stringify({ ...pending.fields, review_token: preview.review_token }) });
+  sessionStorage.removeItem("aegis.pending-delivery");
+  await deliveryProgress(result.request_id);
+}
+async function deliveryProgress(id) {
+  const result = await api(`/api/v1/deployment-requests/${encodeURIComponent(id)}`);
+  state.activeDeliveryId = id; show("delivery-progress");
+  $("delivery-progress-title").textContent = `${result.app_id} · ${result.environment.toUpperCase()}`;
+  $("delivery-request-id").textContent = result.request_id;
+  $("delivery-progress-state").textContent = `Request ${result.status}. ${result.requires_human_approval ? "Human PROD approval is required. " : ""}${result.requires_operator_sync ? "Operator sync is required." : "GitOps admission and checks must pass before Argo deploys."}`;
+  $("delivery-progress-observed").textContent = `Observed ${new Date(result.status_observed_at).toLocaleString()}`;
+  $("delivery-issue-link").replaceChildren();
+  if (result.issue?.url) {
+    const url = new URL(result.issue.url);
+    if (url.origin === "https://github.com") {
+      const link = node("a", "View delivery request on GitHub ↗");
+      link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+      $("delivery-issue-link").append(link);
+    }
+  }
+}
+$("deployment-form").addEventListener("submit", (event) => { event.preventDefault(); action(previewDeployment); });
+$("confirm-deployment").addEventListener("click", () => action(confirmDeployment));
+$("edit-deployment").addEventListener("click", () => { state.deliveryPreview = null; $("deployment-review").hidden = true; $("deployment-form").hidden = false; });
+$("deployment-environment").addEventListener("change", () => action(async () => { state.releasePage = 1; await loadReleases(); }));
+$("more-releases").addEventListener("click", () => action(async () => { state.releasePage = state.nextReleasePage; await loadReleases(); }));
+for (const id of ["cancel-deployment", "delivery-back"]) $(id).addEventListener("click", () => action(applications));
+$("refresh-delivery").addEventListener("click", () => action(() => deliveryProgress(state.activeDeliveryId)));
+async function registration() {
+  if (!state.session) { show("sign-in"); return; }
+  if (!state.session.allowed_actions.includes("register")) throw new Error("Your identity is not enabled for onboarding.");
+  const repos = await api("/api/v1/repositories");
+  state.repositories = repos.items;
+  $("repository").replaceChildren(new Option("Select a repository", ""));
+  for (const repo of repos.items) $("repository").append(new Option(repo.full_name, repo.repository_id));
+  $("owner").replaceChildren(...state.session.owner_choices.map((o) => new Option(o.label, o.user_id)));
+  $("resource-profile").replaceChildren(...Object.keys(state.session.resource_profiles).map((id) => new Option(id, id)));
+  profileDescription();
+  state.preview = null;
+  $("registration-form").hidden = false; $("review").hidden = true;
+  $("step-config").classList.add("current"); $("step-review").classList.remove("current");
+  show("registration");
+  if (!repos.items.length) error("No eligible repositories. Check your GitHub App installation, source access and platform policy.");
+}
+function fields() {
+  return {
+    repository_id: $("repository").value, app_id: $("app-id").value,
+    display_name: $("display-name").value, owner_user_ids: [$("owner").value],
+    runtime: { profile_id: "python312-web", container_port: Number($("port").value),
+      health_path: $("health-path").value, resource_profile_id: $("resource-profile").value }
+  };
+}
+function detail(label, value) {
+  $("review-details").append(node("dt", label), node("dd", value));
+}
+async function validate() {
+  state.preview = await api("/api/v1/registration-validations", { method: "POST", body: JSON.stringify(fields()) });
+  const preview = state.preview;
+  $("review-details").replaceChildren();
+  $("review-title").textContent = `Review ${preview.fields.display_name}`;
+  detail("Repository", preview.source.full_name);
+  detail("Application ID", preview.fields.app_id);
+  detail("Owner", state.session.login);
+  detail("Runtime", "Python 3.12 / FastAPI");
+  detail("Port / health", `${preview.fields.runtime.container_port} · ${preview.fields.runtime.health_path}`);
+  detail("Resource profile", preview.fields.runtime.resource_profile_id);
+  detail("Source revision", preview.source.source_commit);
+  detail("Initial delivery", "DEV · Manual requests");
+  $("detection-results").replaceChildren();
+  for (const [label, key] of [["Dockerfile", "dockerfile_present"], ["Dependency lock candidate", "dependency_lock_present"], ["Pipeline file", "pipeline_file_present"]]) {
+    const row = node("div", undefined, "check-row");
+    row.append(node("strong", label), node("span", preview.detection[key] ? "Found · validation still required" : "Setup required"));
+    $("detection-results").append(row);
+  }
+  $("registration-form").hidden = true; $("review").hidden = false;
+  $("step-config").classList.remove("current"); $("step-review").classList.add("current");
+  // Persist only confirmed intent and idempotency metadata. Never identity/access tokens.
+  const previous = sessionStorage.getItem("aegis.pending-registration");
+  let pending = null;
+  try { pending = previous ? JSON.parse(previous) : null; } catch { /* discard corrupt local state */ }
+  if (pending && (pending.user_id !== state.session.user_id || JSON.stringify(pending.fields) !== JSON.stringify(preview.fields))) sessionStorage.removeItem("aegis.pending-registration");
+}
+async function submit() {
+  if (!state.preview) throw new Error("Validate your configuration before submitting.");
+  let pending;
+  try { pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration")); } catch { pending = null; }
+  if (!pending || pending.user_id !== state.session.user_id || JSON.stringify(pending.fields) !== JSON.stringify(state.preview.fields)) {
+    pending = { key: crypto.randomUUID(), fields: state.preview.fields, user_id: state.session.user_id };
+    sessionStorage.setItem("aegis.pending-registration", JSON.stringify(pending));
+  }
+  const result = await api("/api/v1/registrations", { method: "POST", headers: { "Idempotency-Key": pending.key },
+    body: JSON.stringify({ ...pending.fields, review_token: state.preview.review_token }) });
+  sessionStorage.removeItem("aegis.pending-registration");
+  sessionStorage.setItem("aegis.last-registration", result.registration_id);
+  await progress(result.registration_id);
+}
+async function recoverPending() {
+  const pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration") || "null");
+  if (!pending || pending.user_id !== state.session.user_id) throw new Error("No interrupted submission belongs to this identity.");
+  const result = await api("/api/v1/registrations", { method: "POST", headers: { "Idempotency-Key": pending.key },
+    body: JSON.stringify({ ...pending.fields, review_token: "recover-existing-reservation-only" }) });
+  sessionStorage.removeItem("aegis.pending-registration");
+  await progress(result.registration_id);
+}
+const statusLabels = {
+  pending_review: "Awaiting review", approved: "Approved", closed_unmerged: "Closed without approval",
+  pending_pr: "Recovering proposal", validation_required: "Validation required",
+  operator_setup_required: "Operator setup required", not_verified: "Not yet verified"
+};
+async function progress(id) {
+  const result = await api(`/api/v1/registrations/${encodeURIComponent(id)}`);
+  state.activeId = result.registration_id;
+  show("progress");
+  $("progress-title").textContent = result.display_name;
+  $("registration-id").textContent = result.registration_id;
+  $("status-observed").textContent = `Status observed: ${new Date(result.status_observed_at).toLocaleString()}. Refresh to check for changes.`;
+  $("pr-link").replaceChildren();
+  if (result.pull_request?.url) {
+    const url = new URL(result.pull_request.url);
+    if (url.origin === "https://github.com") {
+      const link = node("a", "Open registration PR on GitHub ↗");
+      link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+      $("pr-link").append(link);
+    }
+  } else $("pr-link").append(node("p", "Demo registration saved locally. No GitHub PR was created.", "muted"));
+  $("requirements").replaceChildren();
+  for (const requirement of result.requirements) {
+    const row = node("div", undefined, "requirement");
+    const title = node("div"); title.append(node("strong", requirement.name), node("small", requirement.actor));
+    row.append(title, node("span", statusLabels[requirement.status] || requirement.status, "pill neutral"));
+    $("requirements").append(row);
+  }
+}
+$("repository").addEventListener("change", () => {
+  const repo = state.repositories.find((r) => r.repository_id === $("repository").value);
+  if (repo) {
+    const name = repo.full_name.split("/")[1];
+    $("app-id").value = name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    $("display-name").value = name.split("-").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
+  }
+});
+$("resource-profile").addEventListener("change", profileDescription);
+for (const id of ["nav-register", "new-registration", "empty-register"]) $(id).addEventListener("click", () => action(registration));
+for (const id of ["nav-apps", "refresh-apps", "cancel-registration", "back-applications"]) $(id).addEventListener("click", () => action(applications));
+$("registration-form").addEventListener("submit", (event) => { event.preventDefault(); action(validate); });
+$("edit-registration").addEventListener("click", () => {
+  state.preview = null; $("review").hidden = true; $("registration-form").hidden = false;
+  $("step-config").classList.add("current"); $("step-review").classList.remove("current");
+});
+$("submit-registration").addEventListener("click", () => action(submit));
+$("recover-registration").addEventListener("click", () => action(recoverPending));
+$("refresh-progress").addEventListener("click", () => action(() => progress(state.activeId)));
+$("sign-in-button").addEventListener("click", () => action(async () => {
+  if (state.status.mode === "demo") {
+    await api("/auth/demo", { method: "POST" }); await loadSession(); await applications();
+  } else if (state.status.mode === "live") window.location.assign("/auth/github/start");
+}));
+action(async () => {
+  state.status = await api("/api/v1/status");
+  if (state.status.mode === "demo") {
+    $("mode-banner").textContent = "LOCAL DEMO · Illustrative repositories and locally saved registration requests. No GitHub or cluster changes.";
+    $("sign-in-button").textContent = "Enter local demo →";
+    $("sign-in-note").textContent = "Uses a synthetic developer identity on this workstation.";
+  } else if (state.status.mode === "live") {
+    $("mode-banner").textContent = state.status.deployment_enabled
+      ? "Authorized requests → GitOps review and checks → Argo deployment. PROD requires human approval."
+      : "Catalog registration is available. Delivery setup is required before deployment requests can be enabled.";
+  } else {
+    $("mode-banner").textContent = "SETUP REQUIRED · Configure the GitHub App to enable registration, or start the explicit local demo.";
+    $("sign-in-button").textContent = "GitHub App setup required"; $("sign-in-button").disabled = true;
+  }
+  if (state.status.registration_enabled) {
+    try { await loadSession(); await applications(); }
+    catch (e) {
+      show(state.session ? "applications" : "sign-in");
+      if (state.session) error(e.message);
+    }
+  } else show("sign-in");
+});

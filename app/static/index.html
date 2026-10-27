@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Aegis application registration and delivery portal">
+  <title>Aegis · Application platform</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Aegis home"><span class="brand-mark">A</span> aegis<span class="brand-dot">.</span></a>
+      <p class="workspace-label">DEVELOPER PLATFORM</p>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" id="nav-apps"><span aria-hidden="true">▦</span> Applications</button>
+        <button class="nav-item" id="nav-register"><span aria-hidden="true">＋</span> Register application</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.1</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><span>Workspace <span class="crumb">/</span> Application platform</span><div id="identity">Not signed in</div></header>
+      <div class="mode-banner" id="mode-banner" role="status">Loading platform configuration…</div>
+      <main id="main">
+        <section id="sign-in" class="signin card" hidden>
+          <span class="eyebrow">YOUR DELIVERY STARTS HERE</span>
+          <h1>One place to<br>bring your app on board.</h1>
+          <p>Register a supported repository, review its configuration, and follow the setup required for delivery.</p>
+          <button id="sign-in-button" class="primary">Sign in with GitHub <span aria-hidden="true">↗</span></button>
+          <p class="muted" id="sign-in-note">Access follows your GitHub identity and platform policy.</p>
+        </section>
+        <div id="error" class="error" role="alert" tabindex="-1" hidden></div>
+        <section id="applications" hidden>
+          <div class="page-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h1>Applications</h1><p>Bring your repositories into a consistent delivery path.</p></div><button class="primary" id="new-registration">＋ Register application</button></div>
+          <div class="summary-grid"><div class="summary"><span>Registration requests</span><strong id="registration-count">0</strong></div><div class="summary"><span>Initial environment</span><strong>DEV <small>Manual requests</small></strong></div><div class="summary"><span>Production policy</span><strong>Human review <small>Required</small></strong></div></div>
+          <div class="section-label"><h2>Managed applications</h2></div>
+          <div id="managed-applications"></div>
+          <div class="section-label"><h2>Onboarding</h2><button class="text-button" id="refresh-apps">Refresh ↻</button></div>
+          <div id="pending-recovery" class="notice" hidden><p>A previous submission was interrupted. Recover it with the same request key.</p><button class="secondary" id="recover-registration">Recover registration</button></div>
+          <div id="registration-list"></div>
+          <div class="empty card" id="empty-state"><div class="empty-icon" aria-hidden="true">＋</div><h2>Your next application starts here.</h2><p>Choose a GitHub repository and submit its configuration for platform review.</p><button class="secondary" id="empty-register">Register your first application</button></div>
+        </section>
+        <section id="registration" hidden>
+          <div class="page-heading"><div><span class="eyebrow">APPLICATION ONBOARDING</span><h1>Register application</h1><p>A few settings. One reviewed configuration.</p></div><span class="pill neutral">DEV first</span></div>
+          <ol class="stepper" aria-label="Registration steps"><li id="step-config" class="current">1 <span>Configure</span></li><li id="step-review">2 <span>Review</span></li><li id="step-submit">3 <span>Track setup</span></li></ol>
+          <form id="registration-form">
+            <div class="form-layout"><div class="form-main">
+              <section class="card form-card"><div class="card-heading"><span class="number">01</span><div><h2>Repository & ownership</h2><p>Only repositories available to your identity and the platform appear here.</p></div></div>
+                <label for="repository">GitHub repository</label><select id="repository" name="repository_id" required><option value="">Select a repository</option></select>
+                <div class="field-grid"><div><label for="display-name">Application name</label><input id="display-name" maxlength="80" placeholder="Orders API" required></div><div><label for="app-id">Application ID</label><input id="app-id" minlength="3" maxlength="40" pattern="[a-z][a-z0-9]*(-[a-z0-9]+)*" placeholder="orders-api" required><small>Stable identifier. Lowercase letters, numbers and hyphens.</small></div></div>
+                <label for="owner">Application owner</label><select id="owner" required></select><small>Ownership is verified by the backend.</small>
+              </section>
+              <section class="card form-card"><div class="card-heading"><span class="number">02</span><div><h2>Runtime configuration</h2><p>Standard settings for a containerized Python web service.</p></div></div>
+                <div class="runtime"><span class="runtime-icon" aria-hidden="true">Py</span><div><strong>Python 3.12 / FastAPI</strong><small>Supported web-service profile</small></div><span class="pill">Supported</span></div>
+                <div class="field-grid"><div><label for="port">Container port</label><input id="port" type="number" min="1" max="65535" value="8000" required></div><div><label for="health-path">HTTP health path</label><input id="health-path" value="/health" maxlength="200" required></div></div>
+                <label for="resource-profile">Resource profile</label><select id="resource-profile" required></select><small id="resource-description"></small>
+              </section>
+            </div><aside class="card context-panel"><span class="eyebrow">WHAT HAPPENS NEXT</span><h2>A reviewed path to delivery.</h2><ol><li><strong>Validate configuration</strong><p>Check repository access and inspect supported build files.</p></li><li><strong>Submit for review</strong><p>Create a catalog pull request for platform maintainers.</p></li><li><strong>Complete setup</strong><p>Finish pipeline and target setup before requesting deployment.</p></li></ol><div class="context-note"><strong>Initial delivery</strong><p>DEV · Manual requests</p><small>Registration creates a proposal. It does not deploy your application.</small></div></aside></div>
+            <div class="form-actions"><button type="button" class="text-button" id="cancel-registration">Cancel</button><button class="primary" type="submit" id="validate-button">Validate & review <span aria-hidden="true">→</span></button></div>
+          </form>
+          <section id="review" hidden><div class="card form-card"><span class="eyebrow">CONFIRM CONFIGURATION</span><h2 id="review-title">Review registration</h2><dl id="review-details" class="details"></dl><h3>Repository detection</h3><div id="detection-results"></div><p class="notice">Pipeline validation and operator target setup are separate requirements. Submission creates a catalog PR for review.</p></div><div class="form-actions"><button class="secondary" id="edit-registration">Back to edit</button><button class="primary" id="submit-registration">Submit registration for review →</button></div></section>
+        </section>
+        <section id="progress" hidden><div class="page-heading"><div><span class="eyebrow">REGISTRATION REQUEST</span><h1 id="progress-title">Application setup</h1><p>Registration, delivery readiness and healthy deployment are separate states.</p></div><span class="pill neutral">Not deployed</span></div><div class="card form-card"><span class="eyebrow">DURABLE REGISTRATION ID</span><p id="registration-id" class="mono"></p><div id="pr-link"></div><p id="status-observed" class="muted"></p><div class="section-label"><h2>Setup requirements</h2><button class="text-button" id="refresh-progress">Refresh ↻</button></div><div id="requirements"></div><p class="notice">Deployment is unavailable in this first increment. The reusable multi-app engine and release admission must be connected before DEV requests can be enabled.</p></div><div class="form-actions"><button class="secondary" id="back-applications">Back to applications</button><button disabled class="primary">Request deployment</button></div></section>
+        <section id="deployment" hidden>
+          <div class="page-heading"><div><span class="eyebrow">DELIVERY REQUEST</span><h1 id="deployment-title">Request deployment</h1><p>Review an immutable release and its target before confirming.</p></div></div>
+          <form id="deployment-form" class="card form-card">
+            <label for="deployment-environment">Environment</label><select id="deployment-environment"></select>
+            <label for="deployment-release">Validated release</label><select id="deployment-release" required></select>
+            <p id="deployment-release-note" class="muted"></p>
+            <button type="button" class="text-button" id="more-releases" hidden>Next releases →</button>
+            <p class="notice" id="deployment-policy">GitOps checks revalidate every request. PROD requires independent human approval and operator sync.</p>
+            <div class="form-actions"><button type="button" class="secondary" id="cancel-deployment">Cancel</button><button class="primary" type="submit">Review request →</button></div>
+          </form>
+          <div id="deployment-review" class="card form-card" hidden><h2>Confirm delivery request</h2><dl class="details" id="deployment-review-details"></dl><p class="notice" id="deployment-confirm-note"></p><div class="form-actions"><button class="secondary" id="edit-deployment">Back</button><button class="primary" id="confirm-deployment">Confirm request →</button></div></div>
+        </section>
+        <section id="delivery-progress" hidden>
+          <div class="page-heading"><div><span class="eyebrow">DELIVERY REQUEST</span><h1 id="delivery-progress-title">Request accepted</h1><p>Track admission and review through GitHub. Acceptance does not mean deployment is healthy.</p></div></div>
+          <div class="card form-card"><p class="mono" id="delivery-request-id"></p><p id="delivery-progress-state"></p><div id="delivery-issue-link"></div><p id="delivery-progress-observed" class="muted"></p><button class="secondary" id="refresh-delivery">Refresh request ↻</button></div>
+          <div class="form-actions"><button class="secondary" id="delivery-back">Back to applications</button></div>
+        </section>
+      </main>
+      <footer>AEGIS PLATFORM <span>Authorized requests → Reviewed Git → Argo reconciliation</span></footer>
+    </div>
+  </div>
+</body>
+</html>

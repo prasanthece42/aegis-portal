@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "Resolved trusted inputs for one app/environment; no global branch HEAD or timestamps.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "app_id": {
+      "maxLength": 40,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "App Id",
+      "type": "string"
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
+    "cluster_id": {
+      "minLength": 1,
+      "title": "Cluster Id",
+      "type": "string"
+    },
+    "cluster_uid": {
+      "minLength": 1,
+      "title": "Cluster Uid",
+      "type": "string"
+    },
+    "namespace": {
+      "maxLength": 63,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+      "title": "Namespace",
+      "type": "string"
+    },
+    "source_repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Source Repository Id",
+      "type": "string"
+    },
+    "source_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "title": "Source Commit",
+      "type": "string"
+    },
+    "image_root_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Image Root Digest",
+      "type": "string"
+    },
+    "platform_digests": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "Platform Digests",
+      "type": "object"
+    },
+    "chart_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Chart Version",
+      "type": "string"
+    },
+    "chart_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Chart Sha256",
+      "type": "string"
+    },
+    "effective_values": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Effective Values",
+      "type": "object"
+    },
+    "resolved_cluster_profile": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Resolved Cluster Profile",
+      "type": "object"
+    },
+    "controller_bindings": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Controller Bindings",
+      "type": "object"
+    }
+  },
+  "required": [
+    "app_id",
+    "environment",
+    "cluster_id",
+    "cluster_uid",
+    "namespace",
+    "source_repository_id",
+    "source_commit",
+    "image_root_digest",
+    "platform_digests",
+    "chart_version",
+    "chart_sha256",
+    "effective_values",
+    "resolved_cluster_profile",
+    "controller_bindings"
+  ],
+  "title": "DesiredState",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

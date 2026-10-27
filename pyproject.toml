@@ -1,0 +1,29 @@
+[project]
+name = "aegis-portal"
+version = "0.1.0"
+description = "Aegis application registration portal"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "httpx>=0.28,<1",
+  "cryptography>=44,<50",
+  "aegis-platform==0.3.0",
+]
+
+[tool.uv.sources]
+aegis-platform = { path = "vendor/aegis_platform-0.3.0-py3-none-any.whl" }
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

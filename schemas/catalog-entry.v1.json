@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "Access": {
+      "additionalProperties": false,
+      "properties": {
+        "owner_user_ids": {
+          "items": {
+            "maxLength": 24,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Owner User Ids",
+          "type": "array"
+        },
+        "viewer_user_ids": {
+          "items": {
+            "maxLength": 24,
+            "pattern": "^[1-9][0-9]*$",
+            "type": "string"
+          },
+          "title": "Viewer User Ids",
+          "type": "array"
+        },
+        "deployer_user_ids_by_environment": {
+          "additionalProperties": {
+            "items": {
+              "maxLength": 24,
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "propertyNames": {
+            "enum": [
+              "dev",
+              "staging",
+              "prod"
+            ]
+          },
+          "title": "Deployer User Ids By Environment",
+          "type": "object"
+        }
+      },
+      "required": [
+        "owner_user_ids",
+        "viewer_user_ids",
+        "deployer_user_ids_by_environment"
+      ],
+      "title": "Access",
+      "type": "object"
+    },
+    "Runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "const": "python312-web",
+          "default": "python312-web",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "container_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Container Port",
+          "type": "integer"
+        },
+        "health_path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Health Path",
+          "type": "string"
+        },
+        "resource_profile_id": {
+          "pattern": "^[a-z][a-z0-9-]{0,39}$",
+          "title": "Resource Profile Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "container_port",
+        "health_path",
+        "resource_profile_id"
+      ],
+      "title": "Runtime",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "repository_id": {
+          "maxLength": 24,
+          "pattern": "^[1-9][0-9]*$",
+          "title": "Repository Id",
+          "type": "string"
+        },
+        "installation_id": {
+          "maxLength": 24,
+          "pattern": "^[1-9][0-9]*$",
+          "title": "Installation Id",
+          "type": "string"
+        },
+        "owner": {
+          "title": "Owner",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "default_branch": {
+          "title": "Default Branch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository_id",
+        "installation_id",
+        "owner",
+        "name",
+        "default_branch"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "properties": {
+        "delivery_mode": {
+          "enum": [
+            "manual",
+            "automatic"
+          ],
+          "title": "Delivery Mode",
+          "type": "string"
+        },
+        "cluster_id": {
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "cluster_uid": {
+          "title": "Cluster Uid",
+          "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "type": "string"
+        },
+        "argo_application": {
+          "title": "Argo Application",
+          "type": "string"
+        },
+        "argo_project": {
+          "title": "Argo Project",
+          "type": "string"
+        },
+        "gitops_repository_id": {
+          "maxLength": 24,
+          "pattern": "^[1-9][0-9]*$",
+          "title": "Gitops Repository Id",
+          "type": "string"
+        },
+        "gitops_branch": {
+          "title": "Gitops Branch",
+          "type": "string"
+        },
+        "values_path": {
+          "title": "Values Path",
+          "type": "string"
+        },
+        "access_mapping_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Access Mapping Id"
+        }
+      },
+      "required": [
+        "delivery_mode",
+        "cluster_id",
+        "cluster_uid",
+        "namespace",
+        "argo_application",
+        "argo_project",
+        "gitops_repository_id",
+        "gitops_branch",
+        "values_path",
+        "access_mapping_id"
+      ],
+      "title": "Target",
+      "type": "object"
+    },
+    "Versions": {
+      "additionalProperties": false,
+      "properties": {
+        "workflow_commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Workflow Commit",
+          "type": "string"
+        },
+        "helper_commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Helper Commit",
+          "type": "string"
+        },
+        "chart_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Chart Version",
+          "type": "string"
+        },
+        "chart_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Chart Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow_commit",
+        "helper_commit",
+        "chart_version",
+        "chart_sha256"
+      ],
+      "title": "Versions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "app_id": {
+      "maxLength": 40,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "App Id",
+      "type": "string"
+    },
+    "display_name": {
+      "title": "Display Name",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "access": {
+      "$ref": "#/$defs/Access"
+    },
+    "runtime": {
+      "$ref": "#/$defs/Runtime"
+    },
+    "versions": {
+      "$ref": "#/$defs/Versions"
+    },
+    "environments": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Target"
+      },
+      "propertyNames": {
+        "enum": [
+          "dev",
+          "staging",
+          "prod"
+        ]
+      },
+      "title": "Environments",
+      "type": "object"
+    }
+  },
+  "required": [
+    "app_id",
+    "display_name",
+    "source",
+    "access",
+    "runtime",
+    "versions",
+    "environments"
+  ],
+  "title": "CatalogEntry",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,32 @@
+{
+  "public_origin": "https://aegis.local.example",
+  "app_id": "1000001",
+  "client_id": "REPLACE_WITH_GITHUB_APP_CLIENT_ID",
+  "platform_repository": "example-owner/aegis-platform",
+  "platform_repository_id": "1000002",
+  "platform_installation_id": "1000003",
+  "platform_bot_user_id": "1000004",
+  "platform_branch": "main",
+  "source_installation_ids": ["1000005"],
+  "onboarding_user_ids": ["1000006"],
+  "allowed_owner_user_ids": ["1000006"],
+  "resource_profiles": {
+    "small": {
+      "cpu_request": "100m",
+      "memory_request": "128Mi",
+      "cpu_limit": "500m",
+      "memory_limit": "256Mi"
+    }
+  },
+  "versions": {
+    "workflow_commit": "0000000000000000000000000000000000000000",
+    "helper_commit": "0000000000000000000000000000000000000000",
+    "chart_version": "1.0.0",
+    "chart_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "cluster_id": "kind-local",
+  "cluster_uid": "REPLACE_WITH_ENROLLED_CLUSTER_UID",
+  "gitops_repository_id": "1000007",
+  "issuer_id": "aegis-portal-local",
+  "signing_key_id": "portal-issuer-v1"
+}
