@@ -1,105 +1,117 @@
 # Aegis developer portal
 
-First implementation increment: a separate FastAPI application for authorized repository
-registration. The existing `aegis-cicd` sample remains a consumer of the delivery platform.
+A separate FastAPI application for authorized registration and delivery requests.
+The portal is the front door; reusable CI builds releases, GitOps records the approved
+configuration, and Argo deploys it. PROD still requires independent human approval and
+an authorized operator sync.
 
-Contracts, canonical JSON and desired-state fingerprints now come from the shared
-`aegis-platform==0.3.0` package. A hash-pinned local wheel and source manifest in `vendor/`
-keep this project independently buildable before a remote platform release exists.
-The sibling platform source owns those definitions; `app/contracts.py` and
-`app/fingerprint.py` preserve existing import paths. This does not activate deployment
-or switch the sample app's caller workflow.
+## Current integration
 
-New registration proposals now bind a separate Argo project for DEV (`<app-id>-dev`),
-matching the platform's per-environment project scope. Existing running bindings are
-not migrated by changing this proposal generator.
+Real GitHub App sign-in, reviewed catalog enrollment and two signed DEV requests have
+completed against the public Aegis repositories. The second request created an
+App-authored GitOps PR, ran native CI without execution approval, merged and reached
+Argo Synced/Healthy. The sample application's three environments retained their existing
+pods and images. The generic managed `aegis-portal-dev` deployment validates application
+releases; it receives no portal credentials.
 
-Implemented: GitHub App user sign-in with state/PKCE, opaque server sessions, CSRF/origin
-checks, strict registration contracts, source-file detection, signed review snapshots,
-reviewed catalog PR proposals, Git-backed registration reservation and PR binding,
-duplicate/restart recovery, registration status, and responsive browser screens.
+The configured front door currently runs with operator-private local credentials.
+The operator-owned Kubernetes runtime/gateway tooling is provided for the next reviewed
+installation into `aegis-portal-system`. Publishing this source does not install that
+runtime. Legacy sample catalog enrollment, protected-target integration and rollback
+remain separate work.
 
-**Deployment requests are disabled.** Release admission, the shared multi-app delivery
-engine, image preparation, observations and protected sync are later increments. Registering
-an app does not enable its namespace or deploy it. This service has no cluster credential.
+## Run a local walkthrough
 
-## Run the local walkthrough
-
-Requires Python 3.12 and uv. From this directory:
+Requires Python 3.12 and uv:
 
 ```sh
 uv sync --locked
 AEGIS_MODE=demo uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8010 --no-access-log
 ```
 
-Open <http://127.0.0.1:8010>, choose **Enter local demo**, select a synthetic repository,
-validate configuration and submit registration. Demo records persist under
-`.local/demo-registrations.json`; sessions do not survive restart. Override the demo file
-with `AEGIS_DEMO_DATA`. To reset the walkthrough, stop the service and remove only that
-demo data file. Demo mode accepts loopback clients and local Host values only.
+Open <http://127.0.0.1:8010>. Demo mode is labelled, loopback-only and synthetic. It
+creates no GitHub PR, workflow or deployment. Records persist in ignored
+`.local/demo-registrations.json`; sessions do not survive restart. Use a fresh
+`AEGIS_DEMO_DATA` file for repeatable walkthroughs. Never trust the demo signing issuer
+in a live environment.
 
-The banner always identifies demo mode. It creates no GitHub PR, workflow, namespace or
-deployment, and displays no invented deployment success. The demo signer is a public test
-fixture under a demo issuer; it must never be included in live trusted keys.
+Without `AEGIS_MODE`, browser assets and `/health` work while `/ready` and business APIs
+fail closed. There is no fallback to demo authentication.
 
-Without `AEGIS_MODE`, the portal starts **unconfigured**: browser assets and `/health`
-work, `/ready` and business APIs fail closed. There is no fallback to demo authentication.
+## Live configuration
 
-## Configure live registration
-
-Live integration code is tested with mocked GitHub HTTP responses; it has not been
-validated against a configured GitHub App. The repositories are published separately; GitHub App installation remains an account-owner setup action.
-Before live use, an operator must supply an existing approved platform repository with
-required catalog PR checks and branch protections, App installations, template pins,
-cluster enrollment values, and TLS/callback configuration. The initial resource profile
-in `examples/live-config.json` is illustrative and needs an approved capacity decision.
-
-Copy the example to an operator-managed configuration path and replace all example IDs,
-pins and targets. Do not commit secrets. Configure through the service's secret injection:
+`examples/live-config.json` is illustrative. An operator supplies reviewed real repository,
+App/installation, cluster, workflow, profile and issuer bindings. Shared public contracts
+come from the hash-pinned `aegis-platform==0.4.4` wheel in `vendor/`; this repository builds
+without a sibling checkout. The source manifest describes a local snapshot, not a signed
+package release.
 
 | Environment variable | Value |
 | --- | --- |
 | `AEGIS_MODE` | `live` |
-| `AEGIS_CONFIG` | Path to validated non-secret JSON configuration |
-| `AEGIS_APP_PRIVATE_KEY_FILE` | Protected PEM RSA GitHub App private-key path |
-| `AEGIS_GITHUB_CLIENT_SECRET` | GitHub App client secret; injected server-side |
-| `AEGIS_SIGNING_KEY_FILE` | Protected PEM Ed25519 request-signing key, separate from App key |
+| `AEGIS_CONFIG` | Reviewed public JSON configuration path |
+| `AEGIS_APP_PRIVATE_KEY_FILE` | Protected GitHub App RSA key path |
+| `AEGIS_GITHUB_CLIENT_SECRET` | Server-side injected App OAuth secret |
+| `AEGIS_SIGNING_KEY_FILE` | Separate protected Ed25519 request key path |
+| `AEGIS_SIGNING_PUBLIC_KEY_B64` | Expected reviewed public key; required by the system plan |
 
-Run one process with `--no-access-log`, TLS at the approved local entry point, and
-callback `<public_origin>/auth/github/callback`. Suppress callback query strings at the
-TLS proxy too. Enable expiring user tokens on the GitHub App. Cookie names use the
-`__Host-` prefix in live mode. No browser token storage, PAT reuse, GitHub webhook ingress
-or remote team access is assumed. Session lifetime: 30-minute idle / eight-hour maximum,
-bounded by provider expiry. OAuth state is browser-bound, one-time and expires in five minutes.
+Use TLS at the approved origin, callback `<public_origin>/auth/github/callback`, one
+process and no access logs. Enable expiring GitHub user tokens. OAuth uses browser-bound
+one-time state and PKCE. Opaque live cookies use the `__Host-` prefix; no provider tokens
+are stored in browser storage. Sessions have a 30-minute idle/eight-hour maximum lifetime,
+bounded by provider expiry. A restart requires sign-in again.
 
-Registration currently permits the signed-in allowed individual to own their registration.
-Multi-owner/team grants and viewer-only catalog browsing are not enabled yet. Initial
-source detection checks bounded files at an exact commit, without executing source code;
-file presence does not establish dependency locking, test success or workflow compliance.
+The App capability ceiling includes Contents, Pull requests, Issues and Actions write,
+with Checks/Statuses read. Each operation mints a repository-scoped, permission-reduced
+installation token. The portal uses no personal CLI token, Kubernetes access,
+Administration permission, Workflows write or branch bypass. Source selection requires
+public repositories, current user push access and an approved App installation.
 
-Initial App capability ceiling: Metadata read, Contents write and Pull requests write.
-Source-operation tokens are downscoped to selected source repositories with Contents read;
-platform tokens are downscoped to the selected platform repository. The App permission
-ceiling is repository-wide; use distinct Apps if source owners cannot accept that ceiling.
-Actions/Checks/Statuses/Issues permissions from the LLD are not used until those increments
-are implemented. Workflows write, Administration and branch bypass are not requested.
+For independent operator recovery, `tooling/run_live.py` reads protected local key files
+and starts the configured host service without printing credentials. The one-time
+`tooling/setup_github_app.py` manifest flow creates protected files under ignored
+`.local/github-app/`; it omits unsupported localhost webhook configuration. It never
+overwrites existing keys. Do not recreate the already-installed App for routine startup.
 
-Live registration creates only `portal-registrations/<id>` journal branches,
-`portal-onboarding/<id>` catalog branches and PRs. It never merges them. Journal records
-are Ed25519-signed with issuer, repository audience and principal bindings. Ref creation
-reserves a deterministic operation ID; non-force ref updates resolve concurrent binding.
-Human review and final-base uniqueness/path checks must protect the approved catalog.
-Operational journal refs must be excluded from platform release triggers. Initial history
-is bounded to 100 registrations; exceeding that budget fails visibly rather than hiding
-incomplete discovery. Key rotation/revocation and journal retirement need operator tooling
-before unattended use; the first increment verifies the configured signing key only.
+## Registration and delivery
 
-Interrupted submissions retain their idempotency key and non-secret form fields in browser
-session storage. **Recover registration** resumes the same operation after reauthorization.
-If persistence never occurred, a new validation is required. If source/policy changed
-after reservation, recovery blocks for operator reconciliation. Closed registrations and
-abandoned reservations are not silently overwritten or reused; reviewed cleanup tooling
-is a follow-up. Request IDs are never access grants.
+Registration detects bounded source files at an immutable commit without executing them,
+previews a signed configuration and creates a catalog PR. The portal never approves or
+merges catalog PRs. Registration does not deploy an application.
+
+Deployment preview binds app, environment, immutable release, current grant, source
+lineage, expected app-specific state and fresh cache/prior-health evidence. Confirmation
+persists an Ed25519-signed Git journal, binds a signed issue and dispatches only the
+reviewed GitOps workflow bytes. The worker independently revalidates the request.
+The browser displays the actual delivery PR and trusted measured health; accepted
+requests are never labelled healthy merely because submission succeeded.
+
+Interrupted submissions retain non-secret fields and the original idempotency key in
+session storage. Recovery requires fresh authorization and resumes the same operation.
+Changed source/policy, abandoned reservations and closed proposals fail visibly rather
+than silently overwriting journal history. Request IDs are not access grants.
+
+## Kubernetes front door
+
+The platform's independently reviewed system plan mounts public configuration and
+operator-injected private credentials. No Secret values enter Git or hosted CI. Live
+startup checks the mounted signing key against the expected public binding. `/ready`
+checks configured registration/delivery capability; `/health` remains a liveness endpoint.
+
+After the operator bootstraps the reviewed system branch and verifies pod readiness,
+replace the host entry point with the gateway using the existing HTTPS origin/certificate:
+
+```sh
+.venv/bin/python tooling/run_gateway.py \
+  --agent-config '../aegis-platform/.local/agent.json'
+```
+
+The gateway uses only the explicit enrolled loopback cluster and fixed portal Service.
+It reconnects after pod replacement, preserves OAuth redirects and separate cookies,
+uses isolated upstream clients and suppresses access logs. It never loads App/signing
+keys. Its kubeconfig stays on the operator host. Argo's UI uses a separate local port.
+Keep the host startup tool available for recovery; do not run both listeners on the same
+port. Credential rotation and durable service supervision still require operator work.
 
 ## Validate
 
@@ -111,65 +123,13 @@ node --check app/static/app.js
 uv run --locked python -m app.export_schemas
 ```
 
-The generated JSON schemas live in `schemas/`. API validation also enforces semantic
-checks such as safe health paths and promotion evidence; consumers must not infer
-authorization or health merely from successful schema validation. The DeploymentIntent
-contract is used by the delivery preview and signed request endpoints described below.
+Tests cover authorization/CSRF, bounded strict JSON, signatures, preview expiry, current
+grants, source/cache admission, idempotence/concurrency/restart recovery, trusted status
+readback, readiness key binding and gateway cookie/origin/failure behavior. CI builds a
+non-root read-only image using hash-locked requirements. The pinned reusable release
+workflow publishes tested amd64/arm64 images and complete retained OCI evidence.
 
-An optional browser walkthrough is available as `node tests/browser-smoke.cjs` with
-Playwright installed separately (`PLAYWRIGHT_MODULE` can select an existing installation).
-Run it against a fresh local demo data file. It checks desktop/mobile layouts, field
-errors, a persisted-but-lost submission response, recovery, and disabled deployment.
-Screenshots and results go to ignored `.local/qa/`. This check never runs against live mode.
-
-Tests cover access forgery, CSRF/origin checks, ambiguous/oversized JSON, signature
-tampering, preview expiry/configuration changes, duplicate and concurrent requests,
-partial persistence, restart recovery and session expiry. GitHub transport tests exercise
-token scoping, OAuth exchange and non-force journal updates with mocked responses.
-The app-scoped fingerprint has a published deterministic fixture and tests for relevant
-configuration changes and independence from another app's state.
-
-The lockfile pins exact dependencies. `requirements-prod.txt` is exported with hashes
-for the separate non-root container. Local CI preparation in `.github/workflows/ci.yml`
-checks contracts, code and the container; it has not run on GitHub. This standalone
-bootstrap CI should adopt the approved reusable workflow when that platform increment
-exists. No release workflow is connected to live delivery until reusable platform
-contracts and required checks are implemented and reviewed.
-
-Design references remain in the sibling sample repository's `DOCS/22`–`25` documents.
-
-## Delivery request integration
-
-`POST /api/v1/deployment-validations` previews an immutable source-bound release.
-`POST /api/v1/deployment-requests` confirms it with a UUID-v4 idempotency key, persists
-an Ed25519-signed journal under `portal-requests/`, binds a bot-authored signed issue,
-and dispatches the approved GitOps request workflow. The request ID supports authorized
-readback and retries after response loss. The browser has release selection, review
-and request tracking screens; an accepted request is never labelled healthy.
-
-Live delivery remains disabled by default. Enabling it requires an approved
-`policies/delivery.json`, real app/cluster catalog entries, GitOps installation bindings,
-a deployed `delivery-request.yml` pinned by `delivery_workflow_commit`, and a trusted
-local cache/health observer. These are integration prerequisites, not configuration
-placeholders to bypass. The workflow adapter rechecks the installed workflow bytes
-before dispatch. Protected targets retain human review and operator sync.
-
-## One-time GitHub App setup
-
-```sh
-.venv/bin/python tooling/setup_github_app.py --origin https://localhost:8443
-```
-
-Open the printed loopback setup URL in the account-owner browser. Create the private
-App and install it on selected Aegis repositories. The single-use manifest handshake
-saves RSA App credentials and a separate generated Ed25519 signing key under ignored
-`.local/github-app/`, with directory mode 0700 and file mode 0600. Existing keys are
-never overwritten, callback queries are not logged, and credentials are never printed.
-No personal CLI token is reused by the portal. Enable expiring user tokens in GitHub
-App settings and configure the HTTPS portal callback before live sign-in.
-
-The expanded capability ceiling includes Contents, Pull requests, Issues and Actions
-write, with Checks and Statuses read. Every operation requests a repository-scoped,
-permission-reduced installation token. No Administration, Workflows write, branch
-bypass or Kubernetes access is requested. Earlier registration-only permission notes
-above describe the original increment; this setup manifest is the current ceiling.
+Optional `tests/browser-smoke.cjs` uses separately installed Playwright against a fresh
+local demo, checks desktop/mobile registration and lost-response recovery, and writes
+ignored screenshots under `.local/qa/`. It never uses live OAuth credentials. Design
+references are in the sibling sample repository's `DOCS/22`–`28` documents.

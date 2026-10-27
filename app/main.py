@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import os
 import re
@@ -109,6 +110,15 @@ def create_app(
             if not isinstance(key, Ed25519PrivateKey):
                 raise ValueError("Request signing requires a separate Ed25519 key")
             signer = Signer(key, config.signing_key_id)
+        expected_public = os.getenv("AEGIS_SIGNING_PUBLIC_KEY_B64")
+        if expected_public:
+            actual_public = base64.b64encode(
+                signer.key.public_key().public_bytes(
+                    serialization.Encoding.Raw, serialization.PublicFormat.Raw
+                )
+            ).decode()
+            if not secrets.compare_digest(actual_public, expected_public):
+                raise ValueError("Request signing key does not match its configured public binding")
     sessions = Sessions()
     service = RegistrationService(config, backend, signer) if config else None
     delivery = DeploymentService(config, backend, signer) if config else None
