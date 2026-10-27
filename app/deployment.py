@@ -159,7 +159,7 @@ class DeploymentService:
 
     def result(self, payload: dict) -> dict:
         intent = payload["intent"]
-        return {
+        result = {
             "request_id": intent["request_id"],
             "app_id": intent["app_id"],
             "environment": intent["environment"],
@@ -172,6 +172,9 @@ class DeploymentService:
             "requires_operator_sync": intent["environment"] != "dev",
             "status_observed_at": datetime.now(UTC).isoformat(),
         }
+        if payload["binding"] and hasattr(self.backend, "delivery_status"):
+            result.update(self.backend.delivery_status(intent))
+        return result
 
     def get(self, session: Session, rid: str) -> dict:
         raw = self.backend.journal(rid)

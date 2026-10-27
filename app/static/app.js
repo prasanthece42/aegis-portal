@@ -80,6 +80,10 @@ async function applications() {
   $("registration-list").replaceChildren();
   $("managed-applications").replaceChildren();
   state.applications = managed.items;
+  let interrupted = null, lastDelivery = null;
+  try { interrupted = JSON.parse(sessionStorage.getItem("aegis.pending-delivery")); lastDelivery = JSON.parse(sessionStorage.getItem("aegis.last-delivery")); } catch { /* discard corrupt browser metadata */ }
+  $("pending-delivery-recovery").hidden = !interrupted || interrupted.user_id !== state.session.user_id;
+  $("last-delivery").hidden = !lastDelivery || lastDelivery.user_id !== state.session.user_id;
   for (const app of managed.items) {
     const row = node("article", undefined, "card registration-row");
     const content = node("div");
@@ -159,6 +163,7 @@ async function confirmDeployment() {
   }
   const result = await api("/api/v1/deployment-requests", { method: "POST", headers: { "Idempotency-Key": pending.key }, body: JSON.stringify({ ...pending.fields, review_token: preview.review_token }) });
   sessionStorage.removeItem("aegis.pending-delivery");
+  sessionStorage.setItem("aegis.last-delivery", JSON.stringify({ user_id: state.session.user_id, request_id: result.request_id }));
   await deliveryProgress(result.request_id);
 }
 async function deliveryProgress(id) {
@@ -166,8 +171,9 @@ async function deliveryProgress(id) {
   state.activeDeliveryId = id; show("delivery-progress");
   $("delivery-progress-title").textContent = `${result.app_id} · ${result.environment.toUpperCase()}`;
   $("delivery-request-id").textContent = result.request_id;
-  $("delivery-progress-state").textContent = `Request ${result.status}. ${result.requires_human_approval ? "Human PROD approval is required. " : ""}${result.requires_operator_sync ? "Operator sync is required." : "GitOps admission and checks must pass before Argo deploys."}`;
-  $("delivery-progress-observed").textContent = `Observed ${new Date(result.status_observed_at).toLocaleString()}`;
+  const labels = { accepted: "Request accepted; GitOps processing is pending.", checking: "GitOps proposal created; required checks are running.", awaiting_review: "Waiting for current-head human PROD review.", closed_unmerged: "The GitOps proposal closed without merging.", reconciling: "GitOps change merged; waiting for measured rollout health.", healthy: "The observer verified Argo sync, rollout convergence and HTTP health.", superseded: "A newer request now owns this environment." };
+  $("delivery-progress-state").textContent = labels[result.status] || `Request ${result.status}.`;
+  $("delivery-progress-observed").textContent = `Status observed ${new Date(result.status_observed_at).toLocaleString()}${result.health_observed_at ? ` · Health measured ${new Date(result.health_observed_at).toLocaleString()}` : " · Health has not been verified"}`;
   $("delivery-issue-link").replaceChildren();
   if (result.issue?.url) {
     const url = new URL(result.issue.url);
@@ -175,6 +181,14 @@ async function deliveryProgress(id) {
       const link = node("a", "View delivery request on GitHub ↗");
       link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
       $("delivery-issue-link").append(link);
+    }
+  }
+  if (result.pull_request?.url) {
+    const url = new URL(result.pull_request.url);
+    if (url.origin === "https://github.com") {
+      const link = node("a", "Open GitOps deployment PR ↗");
+      link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+      const paragraph = node("p"); paragraph.append(link); $("delivery-issue-link").append(paragraph);
     }
   }
 }
@@ -185,6 +199,19 @@ $("deployment-environment").addEventListener("change", () => action(async () => 
 $("more-releases").addEventListener("click", () => action(async () => { state.releasePage = state.nextReleasePage; await loadReleases(); }));
 for (const id of ["cancel-deployment", "delivery-back"]) $(id).addEventListener("click", () => action(applications));
 $("refresh-delivery").addEventListener("click", () => action(() => deliveryProgress(state.activeDeliveryId)));
+$("last-delivery").addEventListener("click", () => action(async () => {
+  const saved = JSON.parse(sessionStorage.getItem("aegis.last-delivery") || "null");
+  if (!saved || saved.user_id !== state.session.user_id) throw new Error("No saved request belongs to this identity.");
+  await deliveryProgress(saved.request_id);
+}));
+$("recover-delivery").addEventListener("click", () => action(async () => {
+  const pending = JSON.parse(sessionStorage.getItem("aegis.pending-delivery") || "null");
+  if (!pending || pending.user_id !== state.session.user_id) throw new Error("No interrupted request belongs to this identity.");
+  const result = await api("/api/v1/deployment-requests", { method: "POST", headers: { "Idempotency-Key": pending.key }, body: JSON.stringify({ ...pending.fields, review_token: "recover-existing-reservation-only" }) });
+  sessionStorage.removeItem("aegis.pending-delivery");
+  sessionStorage.setItem("aegis.last-delivery", JSON.stringify({ user_id: state.session.user_id, request_id: result.request_id }));
+  await deliveryProgress(result.request_id);
+}));
 async function registration() {
   if (!state.session) { show("sign-in"); return; }
   if (!state.session.allowed_actions.includes("register")) throw new Error("Your identity is not enabled for onboarding.");

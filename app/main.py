@@ -230,7 +230,8 @@ def create_app(
         return {
             "status": "ready",
             "mode": settings.mode,
-            "capabilities": ["registration"],
+            "capabilities": ["registration"]
+            + (["delivery_requests"] if config.delivery_workflow_commit else []),
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
         }
 

@@ -191,8 +191,98 @@ class DeliveryGitHub:
         return self.installation_token(
             self.config.gitops_installation_id,
             [self.config.gitops_repository_id],
-            {"contents": "read", "statuses": "read", "actions": "write" if write else "read"},
+            {
+                "contents": "read",
+                "statuses": "read",
+                "pull_requests": "read",
+                "actions": "write" if write else "read",
+            },
         )
+
+    def delivery_status(self, intent):
+        _revision, policy = self.catalog_snapshot()
+        repo, token = policy.gitops_repository, self.gitops_token()
+        prs = self.paginate(
+            f"/repos/{repo}/pulls",
+            token,
+            state="all",
+            head=repo.split("/")[0] + ":aegis-requests/" + intent["request_id"],
+        )
+        if not prs:
+            return {"status": "accepted", "health": "not_observed"}
+        if len(prs) != 1:
+            raise PortalError(
+                503, "REQUEST_STATE_INVALID", "Request has ambiguous GitOps proposals."
+            )
+        pr = self.api("GET", f"/repos/{repo}/pulls/{prs[0]['number']}", token).json()
+        if (
+            str(pr["user"]["id"]) not in policy.workflow_bot_user_ids
+            or pr["user"].get("type") != "Bot"
+            or str(pr["head"]["repo"]["id"]) != policy.gitops_repository_id
+            or pr["head"]["ref"] != "aegis-requests/" + intent["request_id"]
+            or str(pr["base"]["repo"]["id"]) != policy.gitops_repository_id
+            or pr["base"]["ref"]
+            != {"dev": "main", "staging": "staging", "prod": "prod"}[intent["environment"]]
+        ):
+            raise PortalError(503, "REQUEST_STATE_INVALID", "GitOps proposal identity differs.")
+        result = {
+            "status": "awaiting_review" if intent["environment"] == "prod" else "checking",
+            "health": "not_observed",
+            "pull_request": {
+                "number": pr["number"],
+                "url": pr["html_url"],
+                "state": pr["state"],
+                "merged": bool(pr.get("merged_at")),
+            },
+        }
+        if not pr.get("merged_at"):
+            if pr["state"] == "closed":
+                result["status"] = "closed_unmerged"
+            return result
+        entry = CatalogEntry.model_validate(
+            strict_json(
+                self.file(
+                    self.config.platform_repository,
+                    f"catalog/apps/{intent['app_id']}.json",
+                    _revision,
+                    self.platform_token(),
+                )
+            )
+        )
+        target = entry.environments[intent["environment"]]
+        pointer_path = target.values_path.rsplit("/", 1)[0] + "/release.json"
+        pointer = strict_json(self.file(repo, pointer_path, target.gitops_branch, token))
+        if pointer.get("delivery_id") != intent["request_id"]:
+            result["status"] = "superseded"
+            return result
+        current = self.current_intent(entry, intent["environment"], policy)
+        result["status"] = "reconciling"
+        if current:
+            statuses = self.paginate(
+                f"/repos/{repo}/commits/{current.intent_anchor}/statuses", token
+            )
+            try:
+                observation = verify_status(
+                    statuses,
+                    f"aegis/{entry.app_id}/{intent['environment']}-health",
+                    "Healthy " + current.fingerprint,
+                    current.intent_anchor,
+                    policy,
+                    datetime.now(UTC),
+                )
+            except (ValueError, KeyError, TypeError):
+                result["health"] = "not_healthy_or_not_observed"
+            else:
+                from aegis_platform.delivery import timestamp
+
+                result["health_observed_at"] = observation["created_at"]
+                if (datetime.now(UTC) - timestamp(observation["created_at"])).total_seconds() > 300:
+                    result["health"] = "stale"
+                else:
+                    result.update(
+                        status="healthy", health="healthy", fingerprint=current.fingerprint
+                    )
+        return result
 
     def current_intent(self, entry, environment, policy):
         from aegis_platform.proposal import current_state

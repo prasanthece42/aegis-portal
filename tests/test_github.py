@@ -65,6 +65,35 @@ def test_token_is_repository_and_permission_scoped_with_valid_app_jwt(github_fac
     assert "scoped-installation-token" not in str(requests[0].url)
 
 
+def test_detection_accepts_large_lockfiles_without_raising_other_file_limits(github_factory):
+    create, _key = github_factory
+
+    def handler(request):
+        if request.url.path.endswith("/access_tokens"):
+            return httpx.Response(201, json={"token": "fixture-read-only"})
+        raw = b"x" * 65536 if request.url.path.endswith("uv.lock") else b"file"
+        return httpx.Response(
+            200,
+            json={
+                "type": "file",
+                "size": len(raw),
+                "encoding": "base64",
+                "content": base64.b64encode(raw).decode(),
+            },
+        )
+
+    github = create(handler)
+    source = {
+        "installation_id": "903",
+        "repository_id": "101",
+        "full_name": "demo/orders-api",
+        "source_commit": "a" * 40,
+    }
+    assert github.detection(source)["dependency_lock_present"] is True
+    with pytest.raises(PortalError):
+        github.file("demo/orders-api", "uv.lock", "a" * 40, "fixture-read-only")
+
+
 def test_oauth_exchange_uses_pkce_and_rejects_nonexpiring_tokens(github_factory):
     create, _key = github_factory
 

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -119,6 +120,13 @@ class GitHub(DeliveryGitHub):
             value = response.json()
             items.extend(value[collection] if collection else value)
             if 'rel="next"' not in response.headers.get("Link", ""):
+                status_path = re.fullmatch(
+                    r"/repos/([^/]+/[^/]+)/commits/([0-9a-f]{40})/statuses", path
+                )
+                if status_path:
+                    from aegis_platform.delivery import normalize_statuses
+
+                    return normalize_statuses(items, status_path[1], status_path[2])
                 return items
         raise PortalError(
             503, "DISCOVERY_LIMIT", "Repository discovery exceeded the bounded page budget."

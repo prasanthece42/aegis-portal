@@ -36,6 +36,8 @@
           <div class="summary-grid"><div class="summary"><span>Registration requests</span><strong id="registration-count">0</strong></div><div class="summary"><span>Initial environment</span><strong>DEV <small>Manual requests</small></strong></div><div class="summary"><span>Production policy</span><strong>Human review <small>Required</small></strong></div></div>
           <div class="section-label"><h2>Managed applications</h2></div>
           <div id="managed-applications"></div>
+          <div id="pending-delivery-recovery" class="notice" hidden><p>A delivery confirmation was interrupted. Recover it using its original request key.</p><button class="secondary" id="recover-delivery">Recover delivery request</button></div>
+          <button class="text-button" id="last-delivery" hidden>View last delivery request →</button>
           <div class="section-label"><h2>Onboarding</h2><button class="text-button" id="refresh-apps">Refresh ↻</button></div>
           <div id="pending-recovery" class="notice" hidden><p>A previous submission was interrupted. Recover it with the same request key.</p><button class="secondary" id="recover-registration">Recover registration</button></div>
           <div id="registration-list"></div>
