@@ -154,6 +154,10 @@ class DeploymentService:
             return self.acknowledge(updated)
 
     def acknowledge(self, payload: dict) -> dict:
+        if hasattr(self.backend, "delivery_status"):
+            observed = self.backend.delivery_status(payload["intent"])
+            if observed.get("pull_request", {}).get("merged"):
+                return self.result(payload)
         self.backend.delivery_dispatch(payload["intent"]["request_id"], payload["binding"])
         return self.result(payload)
 

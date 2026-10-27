@@ -148,6 +148,32 @@ def test_retry_rechecks_current_authorization(delivery, monkeypatch):
     assert client.get(result.headers["Location"]).status_code == 403
 
 
+def test_completed_request_retry_does_not_redispatch_the_worker(delivery, monkeypatch):
+    client, app, _, _ = delivery
+    fields, key = confirm(client), str(uuid4())
+    first = client.post(
+        "/api/v1/deployment-requests", json=fields, headers={"Idempotency-Key": key}
+    )
+    assert first.status_code == 202
+    backend = app.state.delivery.backend
+    monkeypatch.setattr(
+        backend,
+        "delivery_status",
+        lambda _: {"status": "healthy", "pull_request": {"merged": True}},
+        raising=False,
+    )
+
+    def unexpected_dispatch(*_):
+        pytest.fail("An already merged request must not re-enter deployment admission")
+
+    monkeypatch.setattr(backend, "delivery_dispatch", unexpected_dispatch)
+    repeated = client.post(
+        "/api/v1/deployment-requests", json=fields, headers={"Idempotency-Key": key}
+    )
+    assert repeated.status_code == 202
+    assert repeated.json()["request_id"] == first.json()["request_id"]
+
+
 def test_deployment_json_contract_forbids_browser_destinations():
     with pytest.raises(ValueError):
         DeploymentFields.model_validate(

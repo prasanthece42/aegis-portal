@@ -216,7 +216,8 @@ class DeliveryGitHub:
             )
         pr = self.api("GET", f"/repos/{repo}/pulls/{prs[0]['number']}", token).json()
         if (
-            str(pr["user"]["id"]) not in policy.workflow_bot_user_ids
+            str(pr["user"]["id"])
+            not in {*policy.workflow_bot_user_ids, self.config.platform_bot_user_id}
             or pr["user"].get("type") != "Bot"
             or str(pr["head"]["repo"]["id"]) != policy.gitops_repository_id
             or pr["head"]["ref"] != "aegis-requests/" + intent["request_id"]
