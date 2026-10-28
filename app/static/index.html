@@ -111,9 +111,13 @@
           </form>
           <div id="deployment-review" class="card form-card" hidden><h2>Confirm delivery request</h2><dl class="details" id="deployment-review-details"></dl><p class="notice" id="deployment-confirm-note"></p><div class="form-actions"><button class="secondary" id="edit-deployment">Back</button><button class="primary" id="confirm-deployment">Confirm request →</button></div></div>
         </section>
+        <section id="pipeline" hidden>
+          <div class="page-heading"><div><span class="eyebrow">DEV DELIVERY</span><h1 id="pipeline-title">DevSecOps pipeline</h1><p>Nine stages, from source validation to measured DEV health.</p></div><button class="secondary" id="pipeline-back">Back to applications</button></div>
+          <div class="card form-card"><p id="pipeline-summary" role="status" aria-live="polite"></p><ol id="pipeline-stages" class="pipeline-stages"></ol><button class="secondary" id="refresh-pipeline">Refresh pipeline ↻</button></div>
+        </section>
         <section id="delivery-progress" hidden>
           <div class="page-heading"><div><span class="eyebrow">DELIVERY REQUEST</span><h1 id="delivery-progress-title">Request accepted</h1><p>Track admission, review and rollout here. Acceptance does not mean deployment is healthy.</p></div></div>
-          <div class="card form-card"><p class="mono" id="delivery-request-id"></p><p id="delivery-progress-state"></p><div id="delivery-issue-link"></div><p id="delivery-progress-observed" class="muted"></p><button class="secondary" id="refresh-delivery">Refresh request ↻</button></div>
+          <div class="card form-card"><p class="mono" id="delivery-request-id"></p><p id="delivery-progress-state"></p><div id="delivery-issue-link"></div><button class="secondary" id="delivery-pipeline" hidden>View nine-stage DEV pipeline</button><p id="delivery-progress-observed" class="muted"></p><button class="secondary" id="refresh-delivery">Refresh request ↻</button></div>
           <div class="form-actions"><button class="secondary" id="delivery-back">Back to applications</button></div>
         </section>
       </main>
