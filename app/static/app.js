@@ -1,7 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
-const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review"];
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring"];
 
 function node(tag, text, cls) {
   const element = document.createElement(tag);
@@ -14,6 +14,7 @@ function show(name) {
   $("error").hidden = true;
   $("nav-apps").classList.toggle("active", name === "applications" || name === "progress");
   $("nav-register").classList.toggle("active", name === "registration");
+  $("nav-monitoring").classList.toggle("active", name === "monitoring");
   $("nav-platform").classList.toggle("active", name === "platform" || name === "workflow-review");
   if (name !== "platform" && window.location.hash === "#platform") history.replaceState(null, "", window.location.pathname);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -55,6 +56,8 @@ async function action(callback) {
   }
 }
 function renderIdentity() {
+  $("nav-monitoring").hidden = !state.session;
+  if (!state.session && typeof clearMonitoring === "function") clearMonitoring();
   $("nav-platform").hidden = !state.session?.allowed_actions?.includes("platform:view");
   $("identity").replaceChildren();
   if (!state.session) { $("identity").textContent = "Not signed in"; return; }
@@ -94,7 +97,10 @@ async function applications() {
     const request = node("button", "Request deployment →", "secondary");
     request.disabled = !state.status.deployment_enabled;
     request.addEventListener("click", () => action(() => deployment(app.app_id)));
-    row.append(content, request); $("managed-applications").append(row);
+    const monitor = node("button", "Monitor →", "secondary");
+    monitor.addEventListener("click", () => action(() => monitoringView(`app:${app.app_id}:${Object.keys(app.environments)[0]}`)));
+    const controls = node("div", undefined, "row-action"); controls.append(monitor, request);
+    row.append(content, controls); $("managed-applications").append(row);
   }
   if (!managed.items.length) $("managed-applications").append(node("p", "No approved applications are available to your identity.", "muted"));
   for (const item of data.items) {
@@ -471,6 +477,8 @@ async function workflowDecision(decision) {
   current.operations[operation] ||= crypto.randomUUID();
   const result = await api(`/api/v1/platform/reviews/${encodeURIComponent(current.repository)}/${current.number}`, { method: "POST", body: JSON.stringify({ action: decision, review_token: current.view.review_token, operation_key: current.operations[operation], reason, acknowledge: true }) });
   $("workflow-result").textContent = result.status === "merged" ? "Merged. The deployment pipeline will report rollout health separately." : `Review recorded as ${state.session.login}. Refresh for current checks and review state.`;
+  $("workflow-result").scrollIntoView({ behavior: "smooth", block: "center" });
+  if (decision === "approve") $("workflow-approve").hidden = true;
   $("workflow-ack").checked = false;
   if (result.status === "merged") $("workflow-form").hidden = true;
 }
@@ -491,7 +499,6 @@ action(async () => {
     $("mode-banner").textContent = state.status.deployment_enabled
       ? "Authorized requests → GitOps review and checks → Argo deployment. PROD requires human approval."
       : "Catalog registration is available. Delivery setup is required before deployment requests can be enabled.";
-    if (state.status.operator_preview) $("mode-banner").textContent = "OPERATOR PREVIEW · Real GitHub reviews use your signed-in identity. The Kubernetes portal rollout remains under review.";
   } else {
     $("mode-banner").textContent = "SETUP REQUIRED · Configure the GitHub App to enable registration, or start the explicit local demo.";
     $("sign-in-button").textContent = "GitHub App setup required"; $("sign-in-button").disabled = true;
