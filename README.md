@@ -102,7 +102,7 @@ fail closed. There is no fallback to demo authentication.
 
 `examples/live-config.json` is illustrative. An operator supplies reviewed real repository,
 App/installation, cluster, workflow, profile and issuer bindings. Shared public contracts
-come from the hash-pinned `aegis-platform==0.4.5` wheel in `vendor/`; this repository builds
+come from the hash-pinned `aegis-platform==0.4.6` wheel in `vendor/`; this repository builds
 without a sibling checkout. The source manifest describes a local snapshot, not a signed
 package release.
 
@@ -196,3 +196,39 @@ ignored screenshots under `.local/qa/`. It never uses live OAuth credentials.
 escaped review titles and logout against an isolated demo with labelled illustrative rows.
 It writes ignored screenshots under `.local/owner-qa/`. Design
 references are in the sibling sample repository's `DOCS/22`–`28` documents.
+
+
+## Monitoring candidate (0.4.0)
+
+The Monitoring screen provides app/environment Metrics, Logs, Alerts and Traces, plus
+log-to-trace navigation and an SVG span timeline. Each backend read rechecks the signed-in
+GitHub identity and the current reviewed application grants. A DEV deployer receives no
+implicit PROD visibility. Platform cluster views require an owner grant; configured portal
+telemetry also requires the current operator grant. Trace details project only spans from
+the selected namespace and enrolled cluster, including when another service shares the ID.
+
+Charts distinguish fresh/stale/missing heartbeats and missing samples. An unavailable
+backend clears prior data and reports its failure. Changing environment or window discards
+older responses; logout removes telemetry from the page. Queries are fixed on the server,
+with bounded windows, rows and payloads. Metric reads and trace-detail reads run concurrently
+within each response. Provider credentials and arbitrary backend URLs never enter the browser.
+
+The candidate uses the reviewed platform observability policy and private query proxies.
+The query password derives from the existing OAuth secret and enrolled cluster UID; rotating
+the OAuth secret requires an independently reviewed fingerprint and query credential update.
+Raw logs and traces stay in the private telemetry stores. Container-log scrubbing covers
+common credentials, but applications must avoid logging private payloads in the first place.
+
+Portal instrumentation starts only in the configured Kubernetes runtime when monitoring
+policy validation succeeds. It emits request counts, duration histograms, a heartbeat,
+sanitized request logs and trace spans. Auth callbacks, probes, static requests, URL queries,
+request headers/bodies and exception text are excluded.
+
+This source is a local candidate. Publishing it does not install the telemetry stack or
+update the configured portal. Exact GitOps review, scoped operator bootstrap and reviewed
+immutable application releases remain required for live end-to-end verification.
+
+`tests/monitoring-browser-smoke.cjs` checks all four views, freshness/failure states,
+log-to-trace navigation, environment switching during slow reads, DEV-only target selection,
+escaping, mobile layout and logout. It uses synthetic hello-aegis responses against an isolated
+demo, saves results under `.local/monitoring-qa/`, and never authenticates to live services.

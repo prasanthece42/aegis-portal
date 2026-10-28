@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "platform_repository_id": "900",
+  "gitops_repository_id": "904",
+  "cluster_id": "kind-local",
+  "cluster_uid": "demo-cluster-not-enrolled",
+  "node_name": "aegis-dev-control-plane",
+  "namespace": "aegis-observability",
+  "retention_hours": 24,
+  "query_password_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "images": {
+    "prometheus": "quay.io/prometheus/prometheus@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2",
+    "alertmanager": "quay.io/prometheus/alertmanager@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a",
+    "loki": "docker.io/grafana/loki@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28",
+    "tempo": "docker.io/grafana/tempo@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044",
+    "collector": "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b",
+    "proxy": "docker.io/nginxinc/nginx-unprivileged@sha256:a6c4f61f456b85b8fdf7ec7ab28cc3e299440e6fb4a9dea520e5fd8fd440025e",
+    "log_agent": "docker.io/library/python@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+  },
+  "kubelet_ca_pem": "-----BEGIN CERTIFICATE-----\nMIIDWTCCAkGgAwIBAgIIYtncGvcNN9AwDQYJKoZIhvcNAQELBQAwMDEuMCwGA1UE\nAwwlYWVnaXMtZGV2LWNvbnRyb2wtcGxhbmUtY2FAMTc5Mjk3Mzk4MTAeFw0yNjEw\nMjUyMzE5NDBaFw0yNzEwMjUyMzE5NDBaMC0xKzApBgNVBAMMImFlZ2lzLWRldi1j\nb250cm9sLXBsYW5lQDE3OTI5NzM5ODEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\nggEKAoIBAQDg7Mem/fNbo1wTswTKgmSYmKfaLb7swRUMfjlreC75ebJZADB3yVXa\naGx0zaa/yCAaU32SfQeqdOo5LEx+mc5v4IEG49qtuKoQrt8IyMCdJv+xK2Te4TJq\nNDRBiaL0P9aB35hvO6DzadPKQ1rR57KOgAmdscCN+ruRsmDYzBWeFPSL+FS2EEEP\nm4NsWv0ADZHV6zQPirDqAAS/R/lruiGJ+/7UckDhMmDlb051MngyzOBt//bU5SN4\ntdAxophJuVhlqV172ZwDgNPKRACKapbUGBF4An9GJi+hEsUwQa+xZ9i2WxoS1vOo\nUe8W2GINOa4wg8yAbCoBBo7toqsBwpFLAgMBAAGjejB4MA4GA1UdDwEB/wQEAwIF\noDATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNVHRMBAf8EAjAAMB8GA1UdIwQYMBaA\nFAQFxi8rzxERyGl0hrsn25bukMfwMCIGA1UdEQQbMBmCF2FlZ2lzLWRldi1jb250\ncm9sLXBsYW5lMA0GCSqGSIb3DQEBCwUAA4IBAQAT7D6JFtJLve4Gs8jofVyb6j22\nl+IP4LYL6D5iQ0SbhuuuPAFhxG5/KBN82gL1FIEJyVXFr/wKhp68jmadMVCWwsQv\nx+Js4383dGq1TkgG/avHPgEVN95ML9EfQk+kF6YT2oszMRCFF1Kcw6swtHSJ8Wid\nKMOveTqGcZTtSCqBqmXmnEwXSHGkgUK604GCjCIEmTLqn1KqgrehxlxmxFHs2QFU\nlPugE/TqoiN467nW+yXbTsNYXcXoPve4pwDJEwfYZ2J9q1pH945jl6eYNdsqbtj6\nPVKB/jhtuUfcaLfcG0IsI9bXlfmuhfVS55lVtxL8xeGo7ovC6FZCh40mMPFF\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIDJDCCAgygAwIBAgIIXSjuqn9bX/4wDQYJKoZIhvcNAQELBQAwMDEuMCwGA1UE\nAwwlYWVnaXMtZGV2LWNvbnRyb2wtcGxhbmUtY2FAMTc5Mjk3Mzk4MTAeFw0yNjEw\nMjUyMzE5NDBaFw0yNzEwMjUyMzE5NDBaMDAxLjAsBgNVBAMMJWFlZ2lzLWRldi1j\nb250cm9sLXBsYW5lLWNhQDE3OTI5NzM5ODEwggEiMA0GCSqGSIb3DQEBAQUAA4IB\nDwAwggEKAoIBAQDd0qMVQ9Wej+BPVjMcTeQsZeX88kytOaAXioog0Drtd8Bha7ip\nFfiMnoMZCpkH8kWrQDRULt57noif3m0ztORw+mLBVrsPAOGr9MlarKuuamMNAFez\nI75A6HyBMXIO8i//6L+KIkVamaIdaGF9Gk5k1jDy5tG6bujYEFfs/p+Q0vY2WHIF\nVDGlBZDGaMiUdC6OO53gkum5Ch/TfO7zqiLq7vCBbKP6XXSd5H2q8Kx15P7owFvT\ngAlIGxUo/DgjdR8s8Jbz8Sm+GRTGpNIDjeqDlqzMIGB5jb8W3QV51PPmcPLAoBnk\noVHiZw869ZN9oHrK5o1f1DiYZ63P1XblxnHHAgMBAAGjQjBAMA4GA1UdDwEB/wQE\nAwICpDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQEBcYvK88REchpdIa7J9uW\n7pDH8DANBgkqhkiG9w0BAQsFAAOCAQEAApSGQZTJCfkP8mg2PKlSB4lAzxkAbRE8\nljSchtpyX0X1HtOUTWC1LzZcLbooR+7iNi4/YW0VkG24Fga77dI0zXhFxFHgYCWt\nD/NTBM/4o1s+GHSKfL/AUr6EyfLTyjPoIAm5fOojoh1xcS1oxo76URgFo7zMOKrR\nY2zy1EM/g4giNskow9P07VOQ/BZxyfpAUqxB6G3gN7QWMESoI3TDNJVD5i0jTovN\n2PQCfEWwEwSk9bRiW2qxszaKKV4mCG6pz/O1CE01b0OIjZJ/i65DB5oQKrR4/fhJ\n7Bsxw/rM4dpH5PXBgcx0i6FvzwG3LM2GnyEw6JRn6U7sDhqPNPK4KA==\n-----END CERTIFICATE-----\n",
+  "gitops_repository": "demo/aegis-gitops",
+  "node_ip": "172.19.0.2"
+}

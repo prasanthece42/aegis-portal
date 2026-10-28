@@ -7,6 +7,7 @@
   <title>Aegis · Application platform</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/app.js" defer></script>
+  <script src="/static/monitoring.js" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -16,9 +17,10 @@
       <nav aria-label="Main navigation">
         <button class="nav-item active" id="nav-apps"><span aria-hidden="true">▦</span> Applications</button>
         <button class="nav-item" id="nav-register"><span aria-hidden="true">＋</span> Register application</button>
+        <button class="nav-item" id="nav-monitoring" hidden><span aria-hidden="true">◷</span> Monitoring</button>
         <button class="nav-item" id="nav-platform" hidden><span aria-hidden="true">⚙</span> Platform owner</button>
       </nav>
-      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.3.1</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
+      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.4</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
     </aside>
     <div class="workspace">
       <header class="topbar"><span>Workspace <span class="crumb">/</span> Application platform</span><div id="identity">Not signed in</div></header>
@@ -63,9 +65,18 @@
         </section>
         <section id="workflow-review" hidden>
           <div class="page-heading"><div><span class="eyebrow">REVIEW & APPROVAL</span><h1 id="workflow-title">Review changes</h1><p>Inspect the exact proposed changes and record your decision here.</p></div><button class="secondary" id="workflow-back">Back to reviews</button></div>
-          <div class="card form-card"><p id="workflow-target" class="mono"></p><p id="workflow-policy" class="notice">Your decision uses your signed-in GitHub identity. PROD requires independent human approval and authorized operator sync.</p><div id="workflow-history"></div><p id="workflow-result" role="status"></p></div>
+          <div class="card form-card"><p id="workflow-target" class="mono"></p><p id="workflow-policy" class="notice">Your decision uses your signed-in GitHub identity. PROD requires independent human approval and authorized operator sync.</p><div id="workflow-history"></div></div>
           <div id="workflow-files"></div>
-          <form id="workflow-form" class="card form-card"><label for="workflow-reason">Review notes</label><textarea id="workflow-reason" maxlength="2000" rows="3" placeholder="Explain required changes or add an approval note"></textarea><label class="workflow-confirm"><input type="checkbox" id="workflow-ack" required> I reviewed these changes and their target.</label><div class="form-actions"><button type="button" id="workflow-refresh" class="secondary">Refresh review</button><button type="submit" class="secondary" id="workflow-changes" value="request_changes">Request changes</button><button type="submit" class="primary" id="workflow-approve" value="approve">Approve changes</button><button type="submit" class="primary" id="workflow-merge" value="merge">Merge approved changes</button></div><p class="muted">Merge succeeds only when current branch checks and review requirements permit it. A merge is not deployment health.</p></form>
+          <p id="workflow-result" role="status" aria-live="polite"></p><form id="workflow-form" class="card form-card"><label for="workflow-reason">Review notes</label><textarea id="workflow-reason" maxlength="2000" rows="3" placeholder="Explain required changes or add an approval note"></textarea><label class="workflow-confirm"><input type="checkbox" id="workflow-ack" required> I reviewed these changes and their target.</label><div class="form-actions"><button type="button" id="workflow-refresh" class="secondary">Refresh review</button><button type="submit" class="secondary" id="workflow-changes" value="request_changes">Request changes</button><button type="submit" class="primary" id="workflow-approve" value="approve">Approve changes</button><button type="submit" class="primary" id="workflow-merge" value="merge">Merge approved changes</button></div><p class="muted">Merge succeeds only when current branch checks and review requirements permit it. A merge is not deployment health.</p></form>
+        </section>
+        <section id="monitoring" hidden>
+          <div class="page-heading"><div><span class="eyebrow">OBSERVABILITY</span><h1 id="monitoring-title">Application monitoring</h1><p>Metrics, container logs, alerts and distributed traces in one place.</p></div><button class="secondary" id="refresh-monitoring">Refresh signals ↻</button></div>
+          <div class="card monitoring-controls"><div><label for="monitoring-target">Application / environment</label><select id="monitoring-target"></select></div><div><label for="monitoring-window">Time window</label><select id="monitoring-window"><option value="15m">Last 15 minutes</option><option value="1h">Last hour</option></select></div></div>
+          <p id="monitoring-observed" class="muted" role="status"></p>
+          <div class="owner-tabs" role="tablist" aria-label="Monitoring signals"><button role="tab" aria-selected="true" data-signal="metrics">Metrics</button><button role="tab" aria-selected="false" data-signal="logs">Logs</button><button role="tab" aria-selected="false" data-signal="alerts">Alerts</button><button role="tab" aria-selected="false" data-signal="traces">Traces</button></div>
+          <div id="monitoring-state" class="notice" role="status"></div><div id="monitoring-content"></div>
+          <section id="trace-detail" class="card form-card" hidden><div class="section-label"><h2>Trace timeline</h2><button class="text-button" id="close-trace">Close trace</button></div><p id="trace-identity" class="mono"></p><div id="trace-spans"></div></section>
+          <p class="muted">Application access is checked for every request. Tracing requires instrumentation; missing samples do not establish health. Local retention is bounded to 24 hours and storage capacity. Alerts stay inside the portal.</p>
         </section>
         <section id="registration" hidden>
           <div class="page-heading"><div><span class="eyebrow">APPLICATION ONBOARDING</span><h1>Register application</h1><p>A few settings. One reviewed configuration.</p></div><span class="pill neutral">DEV first</span></div>

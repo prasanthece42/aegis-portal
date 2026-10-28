@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
 
+from aegis_platform.contracts import AppId, Environment
 from aegis_platform.delivery import DeploymentFields, DeploymentSubmission
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -22,8 +23,10 @@ from app.demo import DemoBackend, demo_config
 from app.deployment import DeploymentService
 from app.errors import PortalError
 from app.github import GitHub
+from app.monitoring import MonitoringService
 from app.registration import RegistrationService
 from app.security import Session, Sessions, Signer, strict_json
+from app.telemetry import Telemetry, TelemetryMiddleware
 from app.workflows import WorkflowService, WorkflowSubmission
 
 STATIC = Path(__file__).parent / "static"
@@ -125,18 +128,34 @@ def create_app(
     service = RegistrationService(config, backend, signer) if config else None
     delivery = DeploymentService(config, backend, signer) if config else None
     workflows = WorkflowService(backend, signer) if config else None
+    monitoring = MonitoringService(backend) if config else None
 
     @asynccontextmanager
     async def lifespan(_app):
-        yield
-        if backend:
-            backend.close()
+        if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
+            try:
+                monitoring.policy()
+                _app.state.telemetry = Telemetry("aegis-portal", "0.4.0")
+                backend.telemetry = _app.state.telemetry
+            except PortalError:
+                pass  # The front door must remain available to repair monitoring.
+        try:
+            yield
+        finally:
+            if _app.state.telemetry:
+                _app.state.telemetry.close()
+            if monitoring:
+                monitoring.close()
+            if backend:
+                backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.3.1", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.4.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
+    app.state.monitoring, app.state.telemetry = monitoring, None
     app.add_middleware(RequestBoundary)
+    app.add_middleware(TelemetryMiddleware, holder=app)
 
     @app.exception_handler(PortalError)
     async def portal_error(_request, exc):
@@ -255,7 +274,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.3.1",
+            "version": "0.4.0",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
@@ -388,6 +407,42 @@ def create_app(
     @app.get("/api/v1/repositories")
     def repositories(session: Auth):
         return {"items": backend.repositories(session)}
+
+    @app.get("/api/v1/applications/{app_id}/observability/{signal}")
+    def app_observability(
+        app_id: AppId,
+        signal: Literal["metrics", "logs", "alerts", "traces"],
+        session: Auth,
+        environment: Environment = "dev",
+        window: Literal["15m", "1h"] = "15m",
+    ):
+        context = monitoring.app_context(session, app_id, environment)
+        return monitoring.query(context, signal, window)
+
+    @app.get("/api/v1/applications/{app_id}/observability/traces/{trace_id}")
+    def app_trace(
+        app_id: AppId,
+        trace_id: str,
+        session: Auth,
+        environment: Environment = "dev",
+    ):
+        context = monitoring.app_context(session, app_id, environment)
+        return monitoring.trace(context, trace_id)
+
+    @app.get("/api/v1/platform/observability/{target}/{signal}")
+    def platform_observability(
+        target: Literal["portal", "cluster"],
+        signal: Literal["metrics", "logs", "alerts", "traces"],
+        session: Auth,
+        window: Literal["15m", "1h"] = "15m",
+    ):
+        context = monitoring.platform_context(session, target)
+        return monitoring.query(context, signal, window)
+
+    @app.get("/api/v1/platform/observability/portal/traces/{trace_id}")
+    def platform_trace(trace_id: str, session: Auth):
+        context = monitoring.platform_context(session, "portal")
+        return monitoring.trace(context, trace_id)
 
     @app.post("/api/v1/registration-validations")
     def validate(fields: RegistrationFields, session: Auth):

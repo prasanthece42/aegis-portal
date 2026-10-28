@@ -7,6 +7,7 @@ import os
 import re
 import threading
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -40,16 +41,22 @@ class GitHub(OwnerGitHub, DeliveryGitHub):
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError("GitHub API path must be relative")
         try:
-            response = self.client.request(
-                method,
-                "https://api.github.com" + path,
-                headers={
-                    "Authorization": "Bearer " + token,
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2026-03-10",
-                },
-                **kwargs,
-            )
+            telemetry = getattr(self, "telemetry", None)
+            with (
+                telemetry.client_span("github.request", "api.github.com")
+                if telemetry
+                else nullcontext()
+            ):
+                response = self.client.request(
+                    method,
+                    "https://api.github.com" + path,
+                    headers={
+                        "Authorization": "Bearer " + token,
+                        "Accept": "application/vnd.github+json",
+                        "X-GitHub-Api-Version": "2026-03-10",
+                    },
+                    **kwargs,
+                )
         except httpx.HTTPError as exc:
             raise PortalError(
                 503, "GITHUB_UNAVAILABLE", "GitHub is unavailable; retry safely.", True
