@@ -12,6 +12,7 @@ from app.contracts import (
     RegistrationFields,
     RegistrationSubmission,
 )
+from app.workflows import WorkflowSubmission
 
 
 def export(directory: Path):
@@ -24,6 +25,7 @@ def export(directory: Path):
         (RegistrationSubmission, "registration-submission.v1.json"),
         (DeploymentFields, "deployment-fields.v1.json"),
         (DeploymentSubmission, "deployment-submission.v1.json"),
+        (WorkflowSubmission, "workflow-submission.v1.json"),
     ]:
         schema = model.model_json_schema()
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"

@@ -18,7 +18,7 @@
         <button class="nav-item" id="nav-register"><span aria-hidden="true">＋</span> Register application</button>
         <button class="nav-item" id="nav-platform" hidden><span aria-hidden="true">⚙</span> Platform owner</button>
       </nav>
-      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.3</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
+      <div class="sidebar-bottom"><span class="status-dot"></span> Local platform <span class="version">v0.3.1</span><p>Git owns configuration.<br>Argo delivers it.</p></div>
     </aside>
     <div class="workspace">
       <header class="topbar"><span>Workspace <span class="crumb">/</span> Application platform</span><div id="identity">Not signed in</div></header>
@@ -46,7 +46,7 @@
         </section>
         <section id="platform" hidden>
           <div class="page-heading"><div><span class="eyebrow">PLATFORM OWNER</span><h1>Platform overview</h1><p>Inventory, review queues and verified request activity.</p></div><button class="secondary" id="refresh-platform">Refresh overview ↻</button></div>
-          <div class="notice owner-notice"><strong>Reviewed changes. Clear ownership.</strong><p>Approvals and configuration changes follow GitHub review. PROD requires independent human approval and authorized operator sync.</p></div>
+          <div class="notice owner-notice"><strong>Reviewed changes. Clear ownership.</strong><p>Review and approve changes here; GitOps retains the audit record. PROD requires independent human approval and authorized operator sync.</p></div>
           <p class="muted" id="platform-observed" role="status">Loading reviewed platform data…</p>
           <div class="owner-tabs" role="tablist" aria-label="Platform owner views">
             <button id="owner-tab-overview" role="tab" aria-selected="true" aria-controls="owner-overview" data-owner-tab="overview">Overview</button>
@@ -60,6 +60,12 @@
           <section id="owner-applications" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-applications" hidden><div class="section-label"><h2>Managed application inventory</h2></div><p class="muted">Health comes from trusted, matching observer evidence. Missing or stale observations do not count as Healthy.</p><div id="owner-application-list"></div></section>
           <section id="owner-policy" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-policy" hidden><div class="section-label"><h2>Cluster enrollment</h2></div><p class="muted">Enrollment records identify approved targets. This console does not query Kubernetes node readiness.</p><div id="owner-cluster-list" class="owner-grid"></div><div class="section-label"><h2>Resource profiles</h2></div><div id="owner-profile-list" class="owner-grid"></div><div id="owner-policy-links" class="owner-links"></div></section>
           <section id="owner-activity" class="owner-panel" role="tabpanel" aria-labelledby="owner-tab-activity" hidden><div class="section-label"><h2>Signed request activity</h2><span class="muted" id="owner-activity-count"></span></div><p class="muted">A verified historical signature establishes request authenticity, not current deployment health or fresh admission authority.</p><div id="owner-activity-list"></div></section>
+        </section>
+        <section id="workflow-review" hidden>
+          <div class="page-heading"><div><span class="eyebrow">REVIEW & APPROVAL</span><h1 id="workflow-title">Review changes</h1><p>Inspect the exact proposed changes and record your decision here.</p></div><button class="secondary" id="workflow-back">Back to reviews</button></div>
+          <div class="card form-card"><p id="workflow-target" class="mono"></p><p id="workflow-policy" class="notice">Your decision uses your signed-in GitHub identity. PROD requires independent human approval and authorized operator sync.</p><div id="workflow-history"></div><p id="workflow-result" role="status"></p></div>
+          <div id="workflow-files"></div>
+          <form id="workflow-form" class="card form-card"><label for="workflow-reason">Review notes</label><textarea id="workflow-reason" maxlength="2000" rows="3" placeholder="Explain required changes or add an approval note"></textarea><label class="workflow-confirm"><input type="checkbox" id="workflow-ack" required> I reviewed these changes and their target.</label><div class="form-actions"><button type="button" id="workflow-refresh" class="secondary">Refresh review</button><button type="submit" class="secondary" id="workflow-changes" value="request_changes">Request changes</button><button type="submit" class="primary" id="workflow-approve" value="approve">Approve changes</button><button type="submit" class="primary" id="workflow-merge" value="merge">Merge approved changes</button></div><p class="muted">Merge succeeds only when current branch checks and review requirements permit it. A merge is not deployment health.</p></form>
         </section>
         <section id="registration" hidden>
           <div class="page-heading"><div><span class="eyebrow">APPLICATION ONBOARDING</span><h1>Register application</h1><p>A few settings. One reviewed configuration.</p></div><span class="pill neutral">DEV first</span></div>
@@ -81,7 +87,7 @@
           </form>
           <section id="review" hidden><div class="card form-card"><span class="eyebrow">CONFIRM CONFIGURATION</span><h2 id="review-title">Review registration</h2><dl id="review-details" class="details"></dl><h3>Repository detection</h3><div id="detection-results"></div><p class="notice">Pipeline validation and operator target setup are separate requirements. Submission creates a catalog PR for review.</p></div><div class="form-actions"><button class="secondary" id="edit-registration">Back to edit</button><button class="primary" id="submit-registration">Submit registration for review →</button></div></section>
         </section>
-        <section id="progress" hidden><div class="page-heading"><div><span class="eyebrow">REGISTRATION REQUEST</span><h1 id="progress-title">Application setup</h1><p>Registration, delivery readiness and healthy deployment are separate states.</p></div><span class="pill neutral">Not deployed</span></div><div class="card form-card"><span class="eyebrow">DURABLE REGISTRATION ID</span><p id="registration-id" class="mono"></p><div id="pr-link"></div><p id="status-observed" class="muted"></p><div class="section-label"><h2>Setup requirements</h2><button class="text-button" id="refresh-progress">Refresh ↻</button></div><div id="requirements"></div><p class="notice">Deployment is unavailable in this first increment. The reusable multi-app engine and release admission must be connected before DEV requests can be enabled.</p></div><div class="form-actions"><button class="secondary" id="back-applications">Back to applications</button><button disabled class="primary">Request deployment</button></div></section>
+        <section id="progress" hidden><div class="page-heading"><div><span class="eyebrow">REGISTRATION REQUEST</span><h1 id="progress-title">Application setup</h1><p>Registration, delivery readiness and healthy deployment are separate states.</p></div><span class="pill neutral">Not deployed</span></div><div class="card form-card"><span class="eyebrow">DURABLE REGISTRATION ID</span><p id="registration-id" class="mono"></p><div id="pr-link"></div><p id="status-observed" class="muted"></p><div class="section-label"><h2>Setup requirements</h2><button class="text-button" id="refresh-progress">Refresh ↻</button></div><div id="requirements"></div><p class="notice">Deployment becomes available after catalog approval, pipeline setup, target setup and a verified release. Managed applications show eligible deployment actions.</p></div><div class="form-actions"><button class="secondary" id="back-applications">Back to applications</button><button disabled class="primary">Request deployment</button></div></section>
         <section id="deployment" hidden>
           <div class="page-heading"><div><span class="eyebrow">DELIVERY REQUEST</span><h1 id="deployment-title">Request deployment</h1><p>Review an immutable release and its target before confirming.</p></div></div>
           <form id="deployment-form" class="card form-card">
@@ -95,7 +101,7 @@
           <div id="deployment-review" class="card form-card" hidden><h2>Confirm delivery request</h2><dl class="details" id="deployment-review-details"></dl><p class="notice" id="deployment-confirm-note"></p><div class="form-actions"><button class="secondary" id="edit-deployment">Back</button><button class="primary" id="confirm-deployment">Confirm request →</button></div></div>
         </section>
         <section id="delivery-progress" hidden>
-          <div class="page-heading"><div><span class="eyebrow">DELIVERY REQUEST</span><h1 id="delivery-progress-title">Request accepted</h1><p>Track admission and review through GitHub. Acceptance does not mean deployment is healthy.</p></div></div>
+          <div class="page-heading"><div><span class="eyebrow">DELIVERY REQUEST</span><h1 id="delivery-progress-title">Request accepted</h1><p>Track admission, review and rollout here. Acceptance does not mean deployment is healthy.</p></div></div>
           <div class="card form-card"><p class="mono" id="delivery-request-id"></p><p id="delivery-progress-state"></p><div id="delivery-issue-link"></div><p id="delivery-progress-observed" class="muted"></p><button class="secondary" id="refresh-delivery">Refresh request ↻</button></div>
           <div class="form-actions"><button class="secondary" id="delivery-back">Back to applications</button></div>
         </section>

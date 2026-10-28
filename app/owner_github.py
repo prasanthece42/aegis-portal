@@ -199,6 +199,7 @@ class OwnerGitHub:
             rows.append(
                 {
                     "repository": label,
+                    "repository_key": label.lower(),
                     "number": number,
                     "title": pr["title"],
                     "branch": pr["base"]["ref"],
@@ -327,6 +328,18 @@ class OwnerGitHub:
                 }
             )
         reviews, platform_total = self.owner_reviews(repo, token, "Platform")
+        portal_total = 0
+        portal = catalog.apps.get("aegis-portal")
+        if portal:
+            portal_token = self.installation_token(
+                portal.source.installation_id,
+                [portal.source.repository_id],
+                {"contents": "read", "pull_requests": "read", "checks": "read", "statuses": "read"},
+            )
+            portal_reviews, portal_total = self.owner_reviews(
+                portal.source.owner + "/" + portal.source.name, portal_token, "Portal"
+            )
+            reviews += portal_reviews
         gitops_reviews, gitops_total = self.owner_reviews(
             policy.gitops_repository, gitops_token, "GitOps"
         )
@@ -361,7 +374,7 @@ class OwnerGitHub:
                 for cluster in catalog.clusters.values()
             ],
             "reviews": reviews + gitops_reviews,
-            "review_total": platform_total + gitops_total,
+            "review_total": platform_total + portal_total + gitops_total,
             "activity": activity,
             "activity_total": len(issues),
             "policy": {

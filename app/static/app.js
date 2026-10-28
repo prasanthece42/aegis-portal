@@ -1,7 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
-const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform"];
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review"];
 
 function node(tag, text, cls) {
   const element = document.createElement(tag);
@@ -14,7 +14,7 @@ function show(name) {
   $("error").hidden = true;
   $("nav-apps").classList.toggle("active", name === "applications" || name === "progress");
   $("nav-register").classList.toggle("active", name === "registration");
-  $("nav-platform").classList.toggle("active", name === "platform");
+  $("nav-platform").classList.toggle("active", name === "platform" || name === "workflow-review");
   if (name !== "platform" && window.location.hash === "#platform") history.replaceState(null, "", window.location.pathname);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -381,7 +381,8 @@ async function platformOverview() {
   ownerCheck($("owner-safeguards"), "Protected sync", "Authorized " + data.policy.protected_sync_mode);
   ownerCheck($("owner-safeguards"), "Health freshness", "Healthy only with a matching observation within 5 minutes");
   ownerCheck($("owner-access"), "Signed-in owner", state.session.login);
-  ownerCheck($("owner-access"), "Console access", "Read-only · Explicit platform grant");
+  ownerCheck($("owner-access"), "Inventory access", "Read-only · Explicit platform grant");
+  ownerCheck($("owner-access"), "Review actions", "Your current repository permissions and reviewer grants");
   ownerCheck($("owner-access"), "Configuration changes", "Reviewed GitHub pull requests");
   $("owner-access").append(ownerLink("Review owner policy ↗", data.policy.owner_policy_url));
   $("owner-review-count").textContent = `Showing ${data.reviews.length} of ${data.review_total}`;
@@ -389,7 +390,12 @@ async function platformOverview() {
   for (const review of data.reviews) {
     const row = node("article", undefined, "card registration-row"); const content = node("div");
     content.append(node("h3", review.title), node("p", `${review.repository} #${review.number} · ${review.branch} · ${review.draft ? "Draft" : "Open"}`));
-    const actions = node("div", undefined, "row-action"); actions.append(node("span", checkLabels[review.ci_state] || "Unknown", "pill " + (review.ci_state === "failing" ? "owner-warning" : "neutral")), ownerLink("Review in GitHub ↗", review.url));
+    const actions = node("div", undefined, "row-action"); actions.append(node("span", checkLabels[review.ci_state] || "Unknown", "pill " + (review.ci_state === "failing" ? "owner-warning" : "neutral")));
+    if (data.mode === "live") {
+      const open = node("button", "Review changes", "secondary");
+      open.addEventListener("click", () => action(() => workflowReview(review.repository_key || review.repository.toLowerCase(), review.number)));
+      actions.append(open);
+    } else actions.append(node("span", "Reviews available after live sign-in", "muted"));
     row.append(content, actions); $("owner-review-list").append(row);
   }
   if (!data.reviews.length) ownerEmpty($("owner-review-list"), "No open repository reviews.");
@@ -432,6 +438,45 @@ async function platformOverview() {
   }
   if (!data.activity.length) ownerEmpty($("owner-activity-list"), "No signed delivery request activity is available.");
 }
+async function workflowReview(repository, number) {
+  const result = await api(`/api/v1/platform/reviews/${encodeURIComponent(repository)}/${number}`);
+  state.workflow = { repository, number, view: result, operations: {} };
+  show("workflow-review");
+  $("workflow-title").textContent = result.title;
+  $("workflow-target").textContent = `${repository} #${number} · ${result.branch} · ${result.head}`;
+  $("workflow-result").textContent = result.merged ? "Merged. Deployment health is tracked separately." : "Review loaded from exact file contents.";
+  $("workflow-history").replaceChildren();
+  for (const review of result.reviews) $("workflow-history").append(node("p", `${review.user}: ${review.state} · ${review.commit || "No revision"}`, "muted"));
+  $("workflow-files").replaceChildren();
+  for (const file of result.files) {
+    const card = node("details", undefined, "card form-card workflow-file");
+    card.open = true;
+    card.append(node("summary", `${file.status} · ${file.previous_path ? file.previous_path + " → " : ""}${file.path}`));
+    if (file.binary) card.append(node("p", `Before: ${JSON.stringify(file.before)} · After: ${JSON.stringify(file.after)}`, "mono"));
+    card.append(node("pre", file.diff || "No textual difference", "workflow-diff"));
+    $("workflow-files").append(card);
+  }
+  $("workflow-ack").checked = false; $("workflow-reason").value = "";
+  $("workflow-approve").hidden = !result.can_review;
+  $("workflow-changes").hidden = !result.can_review;
+  $("workflow-merge").hidden = !result.can_merge;
+  $("workflow-form").hidden = !result.can_review && !result.can_merge;
+}
+async function workflowDecision(decision) {
+  const current = state.workflow;
+  if (!current || !$("workflow-ack").checked) throw new Error("Review the displayed changes and confirm before continuing.");
+  const reason = $("workflow-reason").value;
+  if (decision === "request_changes" && !reason.trim()) throw new Error("Explain which changes are required.");
+  const operation = JSON.stringify([decision, reason]);
+  current.operations[operation] ||= crypto.randomUUID();
+  const result = await api(`/api/v1/platform/reviews/${encodeURIComponent(current.repository)}/${current.number}`, { method: "POST", body: JSON.stringify({ action: decision, review_token: current.view.review_token, operation_key: current.operations[operation], reason, acknowledge: true }) });
+  $("workflow-result").textContent = result.status === "merged" ? "Merged. The deployment pipeline will report rollout health separately." : `Review recorded as ${state.session.login}. Refresh for current checks and review state.`;
+  $("workflow-ack").checked = false;
+  if (result.status === "merged") $("workflow-form").hidden = true;
+}
+$("workflow-form").addEventListener("submit", event => { event.preventDefault(); action(() => workflowDecision(event.submitter.value)); });
+$("workflow-refresh").addEventListener("click", () => action(() => workflowReview(state.workflow.repository, state.workflow.number)));
+$("workflow-back").addEventListener("click", () => action(async () => { await platformOverview(); ownerTab("reviews"); }));
 $("nav-platform").addEventListener("click", () => action(platformOverview));
 $("refresh-platform").addEventListener("click", () => action(platformOverview));
 for (const button of document.querySelectorAll("[data-owner-tab]")) button.addEventListener("click", () => ownerTab(button.dataset.ownerTab));
@@ -446,6 +491,7 @@ action(async () => {
     $("mode-banner").textContent = state.status.deployment_enabled
       ? "Authorized requests → GitOps review and checks → Argo deployment. PROD requires human approval."
       : "Catalog registration is available. Delivery setup is required before deployment requests can be enabled.";
+    if (state.status.operator_preview) $("mode-banner").textContent = "OPERATOR PREVIEW · Real GitHub reviews use your signed-in identity. The Kubernetes portal rollout remains under review.";
   } else {
     $("mode-banner").textContent = "SETUP REQUIRED · Configure the GitHub App to enable registration, or start the explicit local demo.";
     $("sign-in-button").textContent = "GitHub App setup required"; $("sign-in-button").disabled = true;

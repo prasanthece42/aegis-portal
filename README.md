@@ -24,8 +24,7 @@ protected-target integration and rollback remain separate work.
 ## Platform owner console
 
 Version 0.3.0 adds **Platform owner** navigation and `/#platform`, with Overview,
-Reviews, Applications, Clusters & policy, and Activity views. The console is read-only;
-review links open GitHub. Catalog and configuration changes follow protected PR review.
+Reviews, Applications, Clusters & policy, and Activity views. Inventory is read-only. Version 0.3.1 adds in-portal human review and ordinary protected merge actions; routine reviews stay in the portal. Catalog and configuration changes retain protected PR review behind the portal.
 PROD retains independent human approval and authorized operator sync.
 
 Owner access is a separate grant in the platform repository's reviewed main branch:
@@ -54,6 +53,32 @@ approval. Historical request activity verifies signatures and authorship, includ
 inactive issuers; it does not establish fresh admission or current deployment health.
 Review/activity rows are capped at 20 per source with totals shown. Demo owner access
 is explicitly synthetic and loads no live GitHub or Kubernetes data.
+
+## Review and approve inside the portal
+
+Open **Platform owner → Reviews → Review changes**. The portal loads complete bounded
+file contents at the proposal's base and head, generates the diff, and shows previous
+review decisions. Confirm the displayed target, then approve or request changes.
+**Merge approved changes** uses the expected head and the provider's normal protected
+merge operation; running checks, missing reviews and conflicts remain blocking.
+
+Reviews and merges use the signed-in human's expiring GitHub App user token, never an
+installation token. Every action checks current user identity, numeric repository
+identity, current maintainer permission, the owner visibility grant, and the exact
+reviewed contents. PROD and system changes also require their reviewed reviewer/operator
+grants and independent current-head human approval. The owner inventory grant alone
+confers no repository write authority. These are existing human permissions exercised
+through the portal. GitHub's [review API](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)
+records the human author and explicit commit identity.
+
+Confirmation tokens expire after five minutes. Repeated submissions of the same
+operation reconcile the existing provider review; dismissed reviews or changed intent
+require a new decision. Proposals are bounded to 64 changed files, 256 KiB per file and
+1 MiB total before/after content. Binary changes show exact byte sizes and SHA-256
+identities. Unsupported or incomplete content blocks approval instead of truncating it.
+Demo mode never performs live reviews. An operator may set `AEGIS_OPERATOR_PREVIEW=1`
+for the host recovery service during the initial transition; its banner explicitly
+identifies real GitHub actions and the still-pending Kubernetes rollout.
 
 ## Run a local walkthrough
 
