@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "approve",
+        "request_changes",
+        "merge"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "review_token": {
+      "maxLength": 16384,
+      "minLength": 20,
+      "title": "Review Token",
+      "type": "string"
+    },
+    "operation_key": {
+      "pattern": "^[a-zA-Z0-9-]{16,80}$",
+      "title": "Operation Key",
+      "type": "string"
+    },
+    "reason": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Reason",
+      "type": "string"
+    },
+    "acknowledge": {
+      "const": true,
+      "title": "Acknowledge",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "action",
+    "review_token",
+    "operation_key",
+    "acknowledge"
+  ],
+  "title": "WorkflowSubmission",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

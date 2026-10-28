@@ -5,12 +5,13 @@ import re
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from aegis_platform.delivery import DeploymentFields, DeploymentSubmission
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi import Depends, FastAPI, Request
+from fastapi import Path as ApiPath
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,6 +24,7 @@ from app.errors import PortalError
 from app.github import GitHub
 from app.registration import RegistrationService
 from app.security import Session, Sessions, Signer, strict_json
+from app.workflows import WorkflowService, WorkflowSubmission
 
 STATIC = Path(__file__).parent / "static"
 
@@ -122,6 +124,7 @@ def create_app(
     sessions = Sessions()
     service = RegistrationService(config, backend, signer) if config else None
     delivery = DeploymentService(config, backend, signer) if config else None
+    workflows = WorkflowService(backend, signer) if config else None
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -129,9 +132,10 @@ def create_app(
         if backend:
             backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.3.1", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
+    app.state.workflows = workflows
     app.add_middleware(RequestBoundary)
 
     @app.exception_handler(PortalError)
@@ -251,7 +255,8 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.3.0",
+            "version": "0.3.1",
+            "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
     @app.get("/auth/github/start")
@@ -361,6 +366,24 @@ def create_app(
         if not hasattr(backend, "owner_overview"):
             raise PortalError(403, "PLATFORM_FORBIDDEN", "Platform owner access is not enabled.")
         return backend.owner_overview(session)
+
+    @app.get("/api/v1/platform/reviews/{repository}/{number}")
+    def review_details(
+        repository: Literal["platform", "portal", "gitops"],
+        number: Annotated[int, ApiPath(ge=1)],
+        session: Auth,
+    ):
+        result = workflows.details(session, repository, number)
+        return {key: value for key, value in result.items() if key != "binding"}
+
+    @app.post("/api/v1/platform/reviews/{repository}/{number}")
+    def review_submit(
+        repository: Literal["platform", "portal", "gitops"],
+        number: Annotated[int, ApiPath(ge=1)],
+        fields: WorkflowSubmission,
+        session: Auth,
+    ):
+        return workflows.submit(session, repository, number, fields)
 
     @app.get("/api/v1/repositories")
     def repositories(session: Auth):
