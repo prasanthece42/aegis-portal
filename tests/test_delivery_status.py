@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -134,3 +135,20 @@ def test_newer_intent_supersedes_old_request_without_claiming_current_health(sta
         )
     )
     assert gateway.delivery_status(intent)["status"] == "superseded"
+
+
+def test_security_evidence_requires_a_trusted_fresh_bound_observation(status_reader):
+    gateway, intent, row, _ = status_reader
+    security = {
+        **deepcopy(row),
+        "id": 2,
+        "context": "aegis/orders-api/dev-security",
+        "description": "Restricted runtime " + gateway.current_intent().fingerprint,
+    }
+    original = gateway.paginate
+    gateway.paginate = lambda path, *args, **kwargs: (
+        [row, security] if path.endswith("/statuses") else original(path, *args, **kwargs)
+    )
+    assert gateway.delivery_status(intent)["security_verified"] is True
+    security["creator"]["id"] = 999
+    assert gateway.delivery_status(intent)["security_verified"] is False

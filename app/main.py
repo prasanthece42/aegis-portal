@@ -135,7 +135,7 @@ def create_app(
         if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 monitoring.policy()
-                _app.state.telemetry = Telemetry("aegis-portal", "0.4.0")
+                _app.state.telemetry = Telemetry("aegis-portal", "0.4.1")
                 backend.telemetry = _app.state.telemetry
             except PortalError:
                 pass  # The front door must remain available to repair monitoring.
@@ -149,7 +149,7 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.4.0", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.4.1", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
@@ -274,7 +274,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.4.0",
+            "version": "0.4.1",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
@@ -496,6 +496,26 @@ def create_app(
             ):
                 items.append(entry.model_dump())
         return {"items": items}
+
+    @app.get("/api/v1/applications/{app_id}/pipeline")
+    def application_pipeline(app_id: AppId, session: Auth):
+        from app.pipeline import discover
+
+        delivery.enabled()
+        return discover(backend, session, app_id)
+
+    @app.get("/api/v1/deployment-requests/{request_id}/pipeline")
+    def deployment_pipeline(request_id: str, session: Auth):
+        from app.pipeline import discover
+
+        if not re.fullmatch(r"req-[0-9a-f]{64}", request_id):
+            raise PortalError(404, "REQUEST_UNAVAILABLE", "Request is unavailable.")
+        result = delivery.get(session, request_id)
+        if result["environment"] != "dev":
+            raise PortalError(422, "DEV_ONLY", "Pipeline progress is currently available for DEV.")
+        return discover(
+            backend, session, result["app_id"], release_id=result["release_id"], delivery=result
+        )
 
     @app.post("/api/v1/deployment-validations")
     def validate_deployment(fields: DeploymentFields, session: Auth):

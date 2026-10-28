@@ -273,6 +273,25 @@ class DeliveryGitHub:
                 )
             except (ValueError, KeyError, TypeError):
                 result["health"] = "not_healthy_or_not_observed"
+                if intent["environment"] == "dev":
+                    from aegis_platform.delivery import timestamp
+
+                    matches = [
+                        s
+                        for s in statuses
+                        if s.get("context") == f"aegis/{entry.app_id}/dev-health"
+                    ]
+                    if matches:
+                        latest = max(
+                            matches, key=lambda s: (timestamp(s["created_at"]), int(s["id"]))
+                        )
+                        age = (datetime.now(UTC) - timestamp(latest["created_at"])).total_seconds()
+                        result["health_check_failed"] = (
+                            latest.get("state") == "failure"
+                            and latest.get("sha") == current.intent_anchor
+                            and str(latest.get("creator", {}).get("id")) in policy.observer_user_ids
+                            and 0 <= age <= 300
+                        )
             else:
                 from aegis_platform.delivery import timestamp
 
@@ -283,6 +302,21 @@ class DeliveryGitHub:
                     result.update(
                         status="healthy", health="healthy", fingerprint=current.fingerprint
                     )
+                    if intent["environment"] == "dev":
+                        try:
+                            security = verify_status(
+                                statuses,
+                                f"aegis/{entry.app_id}/dev-security",
+                                "Restricted runtime " + current.fingerprint,
+                                current.intent_anchor,
+                                policy,
+                                datetime.now(UTC),
+                            )
+                            result["security_verified"] = (
+                                datetime.now(UTC) - timestamp(security["created_at"])
+                            ).total_seconds() <= 300
+                        except (ValueError, KeyError, TypeError):
+                            result["security_verified"] = False
         return result
 
     def current_intent(self, entry, environment, policy, *, revision=None):

@@ -1,7 +1,9 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
-const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring"];
+let pipelineSelection = null;
+let pipelineGeneration = 0;
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring", "pipeline"];
 
 function node(tag, text, cls) {
   const element = document.createElement(tag);
@@ -57,6 +59,12 @@ async function action(callback) {
 }
 function renderIdentity() {
   $("nav-monitoring").hidden = !state.session;
+  if (!state.session) {
+    pipelineGeneration++;
+    pipelineSelection = null;
+    $("pipeline-stages").replaceChildren();
+    $("pipeline-summary").textContent = "";
+  }
   if (!state.session && typeof clearMonitoring === "function") clearMonitoring();
   $("nav-platform").hidden = !state.session?.allowed_actions?.includes("platform:view");
   $("identity").replaceChildren();
@@ -100,6 +108,11 @@ async function applications() {
     const monitor = node("button", "Monitor →", "secondary");
     monitor.addEventListener("click", () => action(() => monitoringView(`app:${app.app_id}:${Object.keys(app.environments)[0]}`)));
     const controls = node("div", undefined, "row-action"); controls.append(monitor, request);
+    if (app.access.deployer_user_ids_by_environment.dev?.includes(state.session.user_id)) {
+      const pipeline = node("button", "DEV pipeline →", "secondary");
+      pipeline.addEventListener("click", () => action(() => pipelineView(app.app_id)));
+      controls.append(pipeline);
+    }
     row.append(content, controls); $("managed-applications").append(row);
   }
   if (!managed.items.length) $("managed-applications").append(node("p", "No approved applications are available to your identity.", "muted"));
@@ -178,6 +191,7 @@ async function confirmDeployment() {
 async function deliveryProgress(id) {
   const result = await api(`/api/v1/deployment-requests/${encodeURIComponent(id)}`);
   state.activeDeliveryId = id; show("delivery-progress");
+  $("delivery-pipeline").hidden = result.environment !== "dev";
   $("delivery-progress-title").textContent = `${result.app_id} · ${result.environment.toUpperCase()}`;
   $("delivery-request-id").textContent = result.request_id;
   const labels = { accepted: "Request accepted; GitOps processing is pending.", checking: "GitOps proposal created; required checks are running.", awaiting_review: "Waiting for current-head human PROD review.", closed_unmerged: "The GitOps proposal closed without merging.", reconciling: "GitOps change merged; waiting for measured rollout health.", healthy: "The observer verified Argo sync, rollout convergence and HTTP health.", superseded: "A newer request now owns this environment." };
@@ -511,3 +525,39 @@ action(async () => {
     }
   } else show("sign-in");
 });
+
+async function pipelineView(appId, requestId = null) {
+  pipelineSelection = { appId, requestId };
+  const generation = ++pipelineGeneration;
+  const userId = state.session?.user_id;
+  show("pipeline");
+  $("pipeline-title").textContent = `${appId} · DEV pipeline`;
+  $("pipeline-stages").replaceChildren();
+  $("pipeline-summary").textContent = "Loading verified pipeline evidence…";
+  const path = requestId
+    ? `/api/v1/deployment-requests/${encodeURIComponent(requestId)}/pipeline`
+    : `/api/v1/applications/${encodeURIComponent(appId)}/pipeline`;
+  try {
+    const data = await api(path);
+    if (generation !== pipelineGeneration || state.session?.user_id !== userId || $("pipeline").hidden) return;
+    $("pipeline-summary").textContent = data.message || `Source ${data.source_commit.slice(0, 12)} · Run ${data.run_id}, attempt ${data.run_attempt}`;
+    for (const stage of data.stages) {
+      const item = node("li", undefined, "pipeline-stage");
+      const labels = { queued: "Queued", running: "Running", passed: "Passed", failed: "Failed", skipped: "Skipped", cancelled: "Cancelled", unknown: "Not verified" };
+      item.append(node("strong", `${stage.number}. ${stage.name}`), node("span", labels[stage.state] || "Not verified", `pill pipeline-${stage.state}`));
+      if (stage.message) item.append(node("p", stage.message, "muted"));
+      $("pipeline-stages").append(item);
+    }
+  } catch (error) {
+    if (generation === pipelineGeneration && state.session?.user_id === userId && !$("pipeline").hidden) {
+      $("pipeline-stages").replaceChildren();
+      $("pipeline-summary").textContent = error.message;
+    }
+  }
+}
+$("refresh-pipeline").addEventListener("click", () => { if (pipelineSelection) action(() => pipelineView(pipelineSelection.appId, pipelineSelection.requestId)); });
+$("pipeline-back").addEventListener("click", () => action(applications));
+$("delivery-pipeline").addEventListener("click", () => action(async () => {
+  const result = await api(`/api/v1/deployment-requests/${encodeURIComponent(state.activeDeliveryId)}`);
+  await pipelineView(result.app_id, result.request_id);
+}));
