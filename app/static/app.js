@@ -12,6 +12,7 @@ function node(tag, text, cls) {
   return element;
 }
 function show(name) {
+  if (typeof presentGuidedPane === "function") presentGuidedPane(name);
   for (const id of sections) $(id).hidden = id !== name;
   $("error").hidden = true;
   $("nav-apps").classList.toggle("active", name === "applications" || name === "progress" || name === "dev-setup");
@@ -71,6 +72,7 @@ function renderIdentity() {
   if (!state.session) {
     if (typeof clearUpload === "function") clearUpload();
     if (typeof clearSetup === "function") clearSetup();
+    if (typeof clearOnboarding === "function") clearOnboarding();
     pipelineGeneration++;
     pipelineSelection = null;
     $("pipeline-stages").replaceChildren();
@@ -93,6 +95,7 @@ async function loadSession() {
   renderIdentity();
 }
 async function applications() {
+  if (typeof clearOnboarding === "function") clearOnboarding();
   if (!state.session) { show("sign-in"); return; }
   const data = await api("/api/v1/registrations");
   const managed = await api("/api/v1/applications");
@@ -122,8 +125,8 @@ async function applications() {
     if (app.access.deployer_user_ids_by_environment.dev?.includes(state.session.user_id)) {
       const pipeline = node("button", "DEV pipeline →", "secondary");
       pipeline.addEventListener("click", () => action(() => pipelineView(app.app_id)));
-      const prepare = node("button", "Prepare for DEV →", "secondary");
-      prepare.addEventListener("click", () => action(() => setupView(app.app_id)));
+      const prepare = node("button", "Open app journey →", "secondary");
+      prepare.addEventListener("click", () => action(() => onboardingView(app.app_id)));
       controls.append(prepare, pipeline);
     }
     row.append(content, controls); $("managed-applications").append(row);
@@ -132,13 +135,13 @@ async function applications() {
   for (const item of data.items) {
     const row = node("article", undefined, "card registration-row");
     const content = node("div");
-    content.append(node("h3", item.display_name), node("p", `${item.app_id} · DEV · Not deployed`));
+    content.append(node("h3", item.display_name), node("p", `${item.app_id} · DEV onboarding`));
     const actions = node("div", undefined, "row-action");
     const catalogState = item.requirements[0].status;
     const label = catalogState === "closed_unmerged" ? "Registration closed" : catalogState === "approved" ? "Catalog approved" : "Onboarding pending";
     actions.append(node("span", label, "pill neutral"));
     const view = node("button", "View setup →", "text-button");
-    view.addEventListener("click", () => action(() => progress(item.registration_id)));
+    view.addEventListener("click", () => action(() => onboardingView(item.app_id, item.registration_id)));
     actions.append(view); row.append(content, actions); $("registration-list").append(row);
   }
 }
@@ -157,25 +160,36 @@ async function deployment(appId) {
   $("deployment-form").hidden = false; $("deployment-review").hidden = true;
   show("deployment"); await loadReleases();
 }
+function renderReleaseSelection() {
+  const release = state.releases?.find((r) => r.release_id === $("deployment-release").value);
+  $("deployment-release-identifiers").hidden = !release;
+  $("deployment-release-summary").textContent = release
+    ? `${release.build_label || "Validated build"} · Commit ${release.source_commit?.slice(0, 7) || "unavailable"}${release.published_at ? " · Built " + new Date(release.published_at).toLocaleString() : ""}`
+    : "Choose a validated build to review its source and DEV destination.";
+  $("deployment-release-raw").textContent = release ? `GitHub release: ${release.tag} · Release ID: ${release.release_id}${release.workflow_run_id ? " · Run: " + release.workflow_run_id : ""}` : "";
+}
 async function loadReleases() {
   const env = $("deployment-environment").value;
   if (!env) throw new Error("Your identity has no deployment grant for this application.");
   const data = await api(`/api/v1/applications/${encodeURIComponent(state.deliveryApp.app_id)}/releases?environment=${env}&page=${state.releasePage}`);
-  $("deployment-release").replaceChildren(new Option("Select a validated release", ""));
+  state.releases = data.items;
+  $("deployment-release").replaceChildren(new Option("Select a validated build", ""));
   for (const release of data.items) {
-    const option = new Option(`${release.tag} · ${release.eligible ? release.source_commit.slice(0, 12) : "Not eligible"}`, release.release_id);
+    const option = new Option(`${release.build_label || "Build"} · ${release.eligible ? "Ready for review · " + release.source_commit.slice(0, 7) : "Not eligible"}${release.run_attempt > 1 ? " · Attempt " + release.run_attempt : ""}`, release.release_id);
     option.disabled = !release.eligible;
     $("deployment-release").append(option);
   }
+  renderReleaseSelection();
   state.nextReleasePage = data.next_page; $("more-releases").hidden = !data.next_page;
-  $("deployment-release-note").textContent = "Only source-bound releases from the approved workflows can be selected. Cache and prior-environment health are checked during review.";
+  $("deployment-release-note").textContent = "Only validated builds can be selected. The platform checks the release and destination readiness when you review it.";
 }
 async function previewDeployment() {
   const fields = { app_id: state.deliveryApp.app_id, environment: $("deployment-environment").value, release_id: $("deployment-release").value };
   state.deliveryPreview = await api("/api/v1/deployment-validations", { method: "POST", body: JSON.stringify(fields) });
   const preview = state.deliveryPreview, context = preview.context;
+  const selected = state.releases?.find((r) => r.release_id === preview.fields.release_id);
   $("deployment-review-details").replaceChildren();
-  for (const [label, value] of [["Application", fields.app_id], ["Environment", fields.environment.toUpperCase()],
+  for (const [label, value] of [["Build", selected?.build_label || "Validated build"], ["Application", fields.app_id], ["Environment", fields.environment.toUpperCase()],
     ["Source commit", context.source_commit], ["Immutable image", context.image_root_digest],
     ["Cluster", context.target.cluster_id], ["Namespace", context.target.namespace],
     ["Current desired state", context.expected_desired_fingerprint || "Initial deployment"]]) {
@@ -231,6 +245,7 @@ async function deliveryProgress(id) {
 $("deployment-form").addEventListener("submit", (event) => { event.preventDefault(); action(previewDeployment); });
 $("confirm-deployment").addEventListener("click", () => action(confirmDeployment));
 $("edit-deployment").addEventListener("click", () => { state.deliveryPreview = null; $("deployment-review").hidden = true; $("deployment-form").hidden = false; });
+$("deployment-release").addEventListener("change", renderReleaseSelection);
 $("deployment-environment").addEventListener("change", () => action(async () => { state.releasePage = 1; await loadReleases(); }));
 $("more-releases").addEventListener("click", () => action(async () => { state.releasePage = state.nextReleasePage; await loadReleases(); }));
 for (const id of ["cancel-deployment", "delivery-back"]) $(id).addEventListener("click", () => action(applications));
@@ -249,6 +264,7 @@ $("recover-delivery").addEventListener("click", () => action(async () => {
   await deliveryProgress(result.request_id);
 }));
 async function registration() {
+  if (typeof clearOnboarding === "function") clearOnboarding();
   if (!state.session) { show("sign-in"); return; }
   if (!state.session.allowed_actions.includes("register")) throw new Error("Your identity is not enabled for onboarding.");
   const repos = await api("/api/v1/repositories");
@@ -283,11 +299,25 @@ async function validate() {
   detail("Repository", preview.source.full_name);
   detail("Application ID", preview.fields.app_id);
   detail("Owner", state.session.login);
-  detail("Runtime", "Python 3.12 / FastAPI");
+  detail("Runtime", "Python 3.12 web app");
   detail("Port / health", `${preview.fields.runtime.container_port} · ${preview.fields.runtime.health_path}`);
   detail("Resource profile", preview.fields.runtime.resource_profile_id);
   detail("Source revision", preview.source.source_commit);
-  detail("Initial delivery", "DEV · Manual requests");
+  detail("Initial delivery", "DEV · Explicit deployment confirmation");
+  const automatic = preview.automatic_setup;
+  $("registration-submit-notice").textContent = automatic ? "Submit once to request catalog approval and authorize the exact setup proposals shown above. Required owner reviews remain in place. Deployment requires a separate release review and confirmation." : "Submission creates a catalog proposal. Setup and deployment remain separate requirements.";
+  $("registration-setup-review").hidden = !automatic;
+  $("registration-setup-files").replaceChildren();
+  $("registration-setup-blockers").replaceChildren();
+  $("submit-registration").disabled = Boolean(automatic?.blockers?.length);
+  if (automatic) {
+    $("registration-setup-notice").textContent = automatic.notice;
+    for (const f of [...automatic.workflow_files, ...automatic.target_files]) {
+      const row = node("details"); row.append(node("summary", `${f.path} · ${f.status}`), node("pre", f.content));
+      $("registration-setup-files").append(row);
+    }
+    $("registration-setup-blockers").append(...automatic.blockers.map((b) => node("p", b, "notice")));
+  }
   $("detection-results").replaceChildren();
   for (const [label, key] of [["Dockerfile", "dockerfile_present"], ["Dependency lock candidate", "dependency_lock_present"], ["Pipeline file", "pipeline_file_present"]]) {
     const row = node("div", undefined, "check-row");
@@ -303,6 +333,7 @@ async function validate() {
   if (pending && (pending.user_id !== state.session.user_id || JSON.stringify(pending.fields) !== JSON.stringify(preview.fields))) sessionStorage.removeItem("aegis.pending-registration");
 }
 async function submit() {
+  if (state.preview?.automatic_setup?.blockers?.length) throw new Error("Resolve the setup requirements before submitting.");
   if (!state.preview) throw new Error("Validate your configuration before submitting.");
   let pending;
   try { pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration")); } catch { pending = null; }
@@ -314,7 +345,7 @@ async function submit() {
     body: JSON.stringify({ ...pending.fields, review_token: state.preview.review_token }) });
   sessionStorage.removeItem("aegis.pending-registration");
   sessionStorage.setItem("aegis.last-registration", result.registration_id);
-  await progress(result.registration_id);
+  await onboardingView(result.app_id, result.registration_id);
 }
 async function recoverPending() {
   const pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration") || "null");
@@ -322,7 +353,7 @@ async function recoverPending() {
   const result = await api("/api/v1/registrations", { method: "POST", headers: { "Idempotency-Key": pending.key },
     body: JSON.stringify({ ...pending.fields, review_token: "recover-existing-reservation-only" }) });
   sessionStorage.removeItem("aegis.pending-registration");
-  await progress(result.registration_id);
+  await onboardingView(result.app_id, result.registration_id);
 }
 const statusLabels = {
   pending_review: "Awaiting review", approved: "Approved", closed_unmerged: "Closed without approval",
@@ -404,7 +435,7 @@ function ownerCheck(target, label, value) {
 }
 async function platformOverview() {
   if (!state.session?.allowed_actions?.includes("platform:view")) throw new Error("Platform owner access is required.");
-  show("platform"); ownerTab("overview"); window.location.hash = "platform";
+  show("platform"); ownerTab("overview"); if (!state.onboarding) window.location.hash = "platform";
   for (const id of ["owner-summary", "owner-safeguards", "owner-access", "owner-review-list", "owner-application-list", "owner-cluster-list", "owner-profile-list", "owner-policy-links", "owner-activity-list"]) $(id).replaceChildren();
   $("platform-observed").textContent = "Loading reviewed platform data…";
   const data = await api("/api/v1/platform/overview");
@@ -512,6 +543,7 @@ async function workflowDecision(decision) {
   if (decision === "approve") $("workflow-approve").hidden = true;
   $("workflow-ack").checked = false;
   if (result.status === "merged") $("workflow-form").hidden = true;
+  if (state.onboarding && ["approve", "merge"].includes(decision)) await refreshOnboarding(true);
 }
 $("workflow-form").addEventListener("submit", event => { event.preventDefault(); action(() => workflowDecision(event.submitter.value)); });
 $("workflow-refresh").addEventListener("click", () => action(() => workflowReview(state.workflow.repository, state.workflow.number)));
@@ -535,7 +567,7 @@ action(async () => {
     $("sign-in-button").textContent = "GitHub App setup required"; $("sign-in-button").disabled = true;
   }
   if (state.status.registration_enabled) {
-    try { const ownerRequested = window.location.hash === "#platform"; await loadSession(); if (ownerRequested && state.session.allowed_actions.includes("platform:view")) await platformOverview(); else await applications(); }
+    try { const ownerRequested = window.location.hash === "#platform"; await loadSession(); if (ownerRequested && state.session.allowed_actions.includes("platform:view")) await platformOverview(); else { await applications(); if (typeof resumeOnboarding === "function") await resumeOnboarding(); } }
     catch (e) {
       show(state.session ? "applications" : "sign-in");
       if (state.session) error(e.message);

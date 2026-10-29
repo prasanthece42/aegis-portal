@@ -10,6 +10,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 from aegis_platform.canonical import canonical, digest, strict_json
+from aegis_platform.catalog import Catalog
+from aegis_platform.contracts import CatalogEntry
 from aegis_platform.delivery import authorize
 from aegis_platform.local_agent import LocalAgent
 from aegis_platform.portal_owner import PortalOwnerPolicy
@@ -17,6 +19,7 @@ from aegis_platform.proposal import current_state, proposal
 from aegis_platform.release import ReleaseEvidence
 from aegis_platform.request import verify_request
 
+from app.config import LiveConfig
 from app.setup_contracts import CHARTS, SetupPolicy, make_plan, verify_setup
 from app.setup_github import plan_bytes_equal
 
@@ -94,6 +97,9 @@ class SetupWorker:
                 },
             )
             refs = self.worker.platform.repo("GET", "git/matching-refs/heads/portal-setups/")
+            refs += self.worker.platform.repo(
+                "GET", "git/matching-refs/heads/portal-registrations/"
+            )
             if len(refs) > 100:
                 raise ValueError("Preparation request discovery exceeds its bounded budget")
             completed_path = self.state_path / "completed.json"
@@ -102,18 +108,40 @@ class SetupWorker:
             )
             result = []
             for ref in refs:
-                rid = ref.get("ref", "").removeprefix("refs/heads/portal-setups/")
+                name = ref.get("ref", "")
+                registration = name.startswith("refs/heads/portal-registrations/")
+                original_id = name.rsplit("/", 1)[-1]
+                rid = "setup-" + original_id[4:] if registration else original_id
                 if not re.fullmatch(r"setup-[0-9a-f]{64}", rid):
                     continue
                 try:
                     record = strict_json(
                         self.worker.platform.file("record.json", ref["object"]["sha"])
                     )
+                    if registration:
+                        if not record.get("payload", {}).get("setup_intent"):
+                            continue
+                        if record["payload"].get("registration_id") != original_id:
+                            raise ValueError("Registration journal identity changed")
                     intent, issuer = verify_setup(
                         record, trust, policy, require_fresh=rid not in self.completed
                     )
                     if intent.setup_id != rid:
                         raise ValueError("Setup journal ref differs from its signed identity")
+                    if intent.plan.app_id not in catalog.apps:
+                        if registration:
+                            self.merge_registration(
+                                record["payload"],
+                                intent,
+                                issuer,
+                                policy,
+                                catalog,
+                                delivery,
+                                bootstrap,
+                            )
+                        raise Pending("Waiting for catalog owner approval.")
+                    if registration and not record["payload"].get("binding"):
+                        raise Pending("Waiting for the registration proposal to finish.")
                     entry = catalog.apps[intent.plan.app_id]
                     source = self.worker.source_factory(entry)
                     metadata = source.repo("GET", "")
@@ -178,6 +206,70 @@ class SetupWorker:
                 )
             self.write_state({"updated_at": datetime.now(UTC).isoformat(), "items": result})
             return result
+
+    def merge_registration(self, payload, intent, issuer, policy, catalog, delivery, bootstrap):
+        """Finish only the exact signed catalog proposal after a real owner review."""
+        binding = payload.get("binding")
+        if not binding:
+            raise Pending("Waiting for the registration proposal to finish.")
+        public = LiveConfig.model_validate(
+            strict_json(
+                self.worker.platform.file(
+                    "policies/portal-system.json",
+                    self.worker.platform.repo("GET", "git/ref/heads/main")["object"]["sha"],
+                )
+            )["configuration"]
+        )
+        if (
+            digest(public.model_dump()) != payload["policy_hash"]
+            or intent.requester_user_id not in public.onboarding_user_ids
+            or intent.requester_user_id not in public.allowed_owner_user_ids
+        ):
+            raise ValueError("Current onboarding authorization changed")
+        entry = CatalogEntry.model_validate(payload["catalog_entry"])
+        draft = Catalog(
+            list(catalog.apps.values()) + [entry], list(catalog.clusters.values()), catalog.policy
+        )
+        expected = make_plan(entry, draft, delivery, bootstrap, policy, intent.plan.source_commit)
+        if canonical(expected.model_dump()) != canonical(intent.plan.model_dump()):
+            raise ValueError("Registration setup inputs changed")
+        source = self.worker.source_factory(entry)
+        metadata = source.repo("GET", "")
+        collaborators = source.pages("collaborators", affiliation="all")
+        if (
+            str(metadata["id"]) != entry.source.repository_id
+            or metadata.get("private")
+            or metadata.get("full_name", "").lower() != intent.plan.source_repository.lower()
+            or metadata.get("default_branch") != entry.source.default_branch
+            or entry.source.installation_id not in public.source_installation_ids
+            or source.repo("GET", "git/ref/heads/" + quote(entry.source.default_branch, safe=""))[
+                "object"
+            ]["sha"]
+            != intent.plan.source_commit
+        ):
+            raise ValueError("Registration source access or revision changed")
+        push = any(
+            str(u["id"]) == intent.requester_user_id and u.get("permissions", {}).get("push")
+            for u in collaborators
+        )
+        authorize(entry, intent.requester_user_id, "dev", push)
+        pr = self.worker.platform.repo("GET", f"pulls/{binding['number']}")
+        if (
+            str(pr["base"]["repo"]["id"]) != policy.platform_repository_id
+            or pr["head"]["ref"] != "portal-onboarding/" + payload["registration_id"]
+            or str(pr["user"]["id"]) != issuer.bot_user_id
+            or pr["user"].get("type") != "Bot"
+            or (pr["state"] == "closed" and not pr.get("merged_at"))
+        ):
+            raise ValueError("Catalog proposal identity changed")
+        self.verify_pr(
+            self.worker.platform,
+            pr,
+            {f"catalog/apps/{entry.app_id}.json": canonical(payload["catalog_entry"]).decode()},
+            "main",
+        )
+        self.merge(self.worker.platform, pr, self.target_reviewers)
+        raise Pending("Catalog approval is merged. Preparation resumes on the next cycle.")
 
     def write_state(self, state):
         path = self.state_path / "status.json"

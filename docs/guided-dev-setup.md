@@ -1,3 +1,8 @@
+> New supported registrations can authorize preparation in their initial combined review.
+> [Guided onboarding](guided-onboarding.md) carries that signed plan through owner approval,
+> automatic preparation and release selection. This document also describes the explicit
+> setup path retained for older registrations.
+
 # Guided DEV preparation
 
 After catalog approval, application owners choose **Prepare for DEV** in the portal.

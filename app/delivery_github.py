@@ -85,8 +85,17 @@ class DeliveryGitHub:
             }
             try:
                 evidence, _raw, _release = self.admitted_release(entry, item["release_id"], policy)
+                number = _release.get("aegis_build_number")
                 item.update(
-                    eligible=True, image=evidence.image, source_commit=evidence.source_commit
+                    eligible=True,
+                    image=evidence.image,
+                    source_commit=evidence.source_commit,
+                    workflow_run_id=str(evidence.workflow_run_id),
+                    run_attempt=evidence.run_attempt,
+                    build_number=number,
+                    build_label=f"Build #{number}"
+                    if type(number) is int and number > 0
+                    else "Validated build",
                 )
             except PortalError as exc:
                 if exc.code != "RELEASE_INELIGIBLE":
@@ -210,7 +219,7 @@ class DeliveryGitHub:
             raise PortalError(
                 409, "RELEASE_INELIGIBLE", "Release failed source and workflow admission."
             ) from exc
-        return evidence, raw, release
+        return evidence, raw, {**release, "aegis_build_number": run.get("run_number")}
 
     def gitops_token(self, *, write=False):
         return self.installation_token(

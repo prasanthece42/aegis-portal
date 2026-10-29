@@ -62,6 +62,7 @@ async function setupView(appId) {
 }
 function scheduleSetupRefresh() {
   clearTimeout(setupTimer);
+  if (state.onboarding) return;
   if (activeSetup?.result?.setup_id && activeSetup.result.state !== "ready") setupTimer = setTimeout(async () => {
     if (!activeSetup || $("dev-setup").hidden || !state.session) return;
     if (state.busy) { scheduleSetupRefresh(); return; }

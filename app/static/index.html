@@ -34,6 +34,12 @@
           <p class="muted" id="sign-in-note">Access follows your GitHub identity and platform policy.</p>
         </section>
         <div id="error" class="error" role="alert" tabindex="-1" hidden></div>
+        <section id="onboarding" hidden aria-label="Application onboarding">
+          <div class="page-heading"><div><span class="eyebrow">APPLICATION JOURNEY</span><h1 id="onboarding-title"></h1><p id="onboarding-message" role="status" aria-live="polite"></p></div><button class="secondary" id="onboarding-back">All applications</button></div>
+          <ol id="onboarding-stages" class="journey-stages" aria-label="Onboarding progress"></ol>
+          <div class="card journey-status"><div><strong id="onboarding-actor"></strong><p id="onboarding-observed" class="muted"></p></div><button class="primary" id="onboarding-next" hidden></button><button class="text-button" id="onboarding-refresh">Refresh progress ↻</button></div>
+          <div id="onboarding-content"></div>
+        </section>
         <section id="applications" hidden>
           <div class="page-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h1>Applications</h1><p>Bring your repositories into a consistent delivery path.</p></div><button class="primary" id="new-registration">＋ Register application</button></div>
           <div class="summary-grid"><div class="summary"><span>Registration requests</span><strong id="registration-count">0</strong></div><div class="summary"><span>Initial environment</span><strong>DEV <small>Manual requests</small></strong></div><div class="summary"><span>Production policy</span><strong>Human review <small>Required</small></strong></div></div>
@@ -117,7 +123,7 @@
             </div><aside class="card context-panel"><span class="eyebrow">WHAT HAPPENS NEXT</span><h2>A reviewed path to delivery.</h2><ol><li><strong>Validate configuration</strong><p>Check repository access and inspect supported build files.</p></li><li><strong>Submit for review</strong><p>Create a catalog pull request for platform maintainers.</p></li><li><strong>Complete setup</strong><p>Finish pipeline and target setup before requesting deployment.</p></li></ol><div class="context-note"><strong>Initial delivery</strong><p>DEV · Manual requests</p><small>Registration creates a proposal. It does not deploy your application.</small></div></aside></div>
             <div class="form-actions"><button type="button" class="text-button" id="cancel-registration">Cancel</button><button class="primary" type="submit" id="validate-button">Validate & review <span aria-hidden="true">→</span></button></div>
           </form>
-          <section id="review" hidden><div class="card form-card"><span class="eyebrow">CONFIRM CONFIGURATION</span><h2 id="review-title">Review registration</h2><dl id="review-details" class="details"></dl><h3>Repository detection</h3><div id="detection-results"></div><p class="notice">Pipeline validation and operator target setup are separate requirements. Submission creates a catalog PR for review.</p></div><div class="form-actions"><button class="secondary" id="edit-registration">Back to edit</button><button class="primary" id="submit-registration">Submit registration for review →</button></div></section>
+          <section id="review" hidden><div class="card form-card"><span class="eyebrow">CONFIRM CONFIGURATION</span><h2 id="review-title">Review registration</h2><dl id="review-details" class="details"></dl><h3>Repository detection</h3><div id="detection-results"></div><div id="registration-setup-review" hidden><h3>Proposed pipeline and DEV setup</h3><p id="registration-setup-notice" class="notice"></p><div id="registration-setup-files"></div><div id="registration-setup-blockers" role="status"></div></div><p class="notice" id="registration-submit-notice">Submit once to request catalog approval and authorize the exact setup proposals shown above. Required owner reviews remain in place. Deployment requires a separate release review and confirmation.</p></div><div class="form-actions"><button class="secondary" id="edit-registration">Back to edit</button><button class="primary" id="submit-registration">Submit registration for review →</button></div></section>
         </section>
         <section id="progress" hidden><div class="page-heading"><div><span class="eyebrow">REGISTRATION REQUEST</span><h1 id="progress-title">Application setup</h1><p>Registration, delivery readiness and healthy deployment are separate states.</p></div><span class="pill neutral">Not deployed</span></div><div class="card form-card"><span class="eyebrow">DURABLE REGISTRATION ID</span><p id="registration-id" class="mono"></p><div id="pr-link"></div><p id="status-observed" class="muted"></p><div class="section-label"><h2>Setup requirements</h2><button class="text-button" id="refresh-progress">Refresh ↻</button></div><div id="requirements"></div><p class="notice">Deployment becomes available after catalog approval, pipeline setup, target setup and a verified release. Managed applications show eligible deployment actions.</p></div><div class="form-actions"><button class="secondary" id="back-applications">Back to applications</button><button class="secondary" id="progress-prepare" hidden>Prepare for DEV</button><button disabled class="primary" id="progress-deploy">Request deployment</button></div></section>
         <section id="deployment" hidden>
@@ -125,7 +131,7 @@
           <form id="deployment-form" class="card form-card">
             <label for="deployment-environment">Environment</label><select id="deployment-environment"></select>
             <label for="deployment-release">Validated release</label><select id="deployment-release" required></select>
-            <p id="deployment-release-note" class="muted"></p>
+            <p id="deployment-release-summary" role="status"></p><details id="deployment-release-identifiers"><summary>Release identifiers</summary><p id="deployment-release-raw" class="mono"></p></details><p id="deployment-release-note" class="muted"></p>
             <button type="button" class="text-button" id="more-releases" hidden>Next releases →</button>
             <p class="notice" id="deployment-policy">GitOps checks revalidate every request. PROD requires independent human approval and operator sync.</p>
             <div class="form-actions"><button type="button" class="secondary" id="cancel-deployment">Cancel</button><button class="primary" type="submit">Review request →</button></div>
@@ -147,5 +153,6 @@
   </div>
 <script src="/static/uploads.js" defer></script>
 <script src="/static/setup.js" defer></script>
+<script src="/static/journey.js" defer></script>
 </body>
 </html>

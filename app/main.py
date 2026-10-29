@@ -165,7 +165,7 @@ def create_app(
         if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 monitoring.policy()
-                _app.state.telemetry = Telemetry("aegis-portal", "0.6.1")
+                _app.state.telemetry = Telemetry("aegis-portal", "0.7.0")
                 backend.telemetry = _app.state.telemetry
             except PortalError:
                 pass  # The front door must remain available to repair monitoring.
@@ -179,7 +179,7 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.6.1", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.7.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
@@ -323,7 +323,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.6.1",
+            "version": "0.7.0",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
@@ -456,6 +456,14 @@ def create_app(
     @app.get("/api/v1/applications/{app_id}/dev-setup")
     def setup_latest(app_id: AppId, session: Auth):
         return setup.latest(session, app_id)
+
+    @app.get("/api/v1/applications/{app_id}/onboarding")
+    def application_onboarding(app_id: AppId, session: Auth, registration_id: str | None = None):
+        from app.onboarding import onboarding_status
+
+        if registration_id and not re.fullmatch(r"reg-[0-9a-f]{64}", registration_id):
+            raise PortalError(404, "REGISTRATION_NOT_FOUND", "Registration is unavailable.")
+        return onboarding_status(session, app_id, registration_id, service, setup, delivery)
 
     @app.post("/api/v1/applications/{app_id}/dev-setup-validations")
     def setup_preview(app_id: AppId, session: Auth):
