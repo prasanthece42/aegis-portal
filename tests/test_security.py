@@ -131,3 +131,33 @@ def test_signature_hash_canonicalization_and_algorithm_rejection():
         strict_json('{"x":1,"x":2}')
     with pytest.raises(ValueError):
         strict_json(json.dumps({"number": float("nan")}))
+
+
+def test_unexpected_server_failure_returns_sanitized_json(portal, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    signed_in, app = portal
+
+    def broken(_session):
+        raise RuntimeError("private upstream diagnostic must not reach browser")
+
+    monkeypatch.setattr(app.state.uploads, "capabilities", broken)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        client.cookies.update(signed_in.cookies)
+        response = client.get("/api/v1/upload-capabilities")
+    assert response.status_code == 500
+    assert response.headers["content-type"] == "application/json"
+    error = response.json()["error"]
+    assert error["code"] == "INTERNAL_ERROR"
+    assert error["retryable"] is True
+    assert len(error["correlation_id"]) == 16
+    assert "private upstream" not in response.text
+
+
+def test_browser_handles_non_json_server_and_gateway_errors():
+    import subprocess
+
+    result = subprocess.run(
+        ["node", "tests/api-errors.cjs"], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr

@@ -313,3 +313,106 @@ def test_registration_creates_only_a_scoped_catalog_pr(github_factory, monkeypat
         assert github.registration_pr(rid, entry)["number"] == 7
     assert len(writes) == 3
     assert not any(path.endswith("/merge") for _method, path, _body in writes)
+
+
+def test_upload_routes_use_real_github_adapter_for_review_create_and_recovery(
+    github_factory, settings
+):
+    import io
+    import zipfile
+
+    create, _ = github_factory
+    repository = None
+    head = "a" * 40
+    mutations = []
+
+    def provider(request):
+        nonlocal repository, head
+        path = request.url.path
+        body = json.loads(request.content) if request.content else None
+        if request.method != "GET":
+            mutations.append((request.method, path))
+        if path == "/user":
+            return httpx.Response(200, json={"id": 1, "login": "demo"})
+        if path == "/user/installations":
+            return httpx.Response(
+                200,
+                json={
+                    "installations": [
+                        {
+                            "id": 903,
+                            "account": {"login": "demo", "type": "User"},
+                            "repository_selection": "all",
+                            "permissions": {"repository_creation": "write"},
+                        }
+                    ]
+                },
+            )
+        if path == "/user/installations/903/repositories":
+            return httpx.Response(200, json={"repositories": [repository] if repository else []})
+        if path == "/user/repos":
+            assert request.method == "POST" and body["private"] is False
+            repository = {
+                "id": 123,
+                "full_name": "demo/hello-portal",
+                "default_branch": "main",
+                "private": False,
+                "description": body["description"],
+                "permissions": {"push": True},
+            }
+            return httpx.Response(201, json=repository)
+        if path == "/repos/demo/hello-portal":
+            return httpx.Response(200 if repository else 404, json=repository or {})
+        if path == "/app/installations/903/access_tokens":
+            assert body == {"repository_ids": [123], "permissions": {"contents": "write"}}
+            return httpx.Response(201, json={"token": "test-scoped-token"})
+        if path.endswith("/git/refs/heads/main"):
+            if request.method == "PATCH":
+                assert body == {"sha": "d" * 40, "force": False}
+                head = body["sha"]
+            return httpx.Response(200, json={"object": {"sha": head}})
+        if path.endswith("/git/commits/" + "a" * 40):
+            return httpx.Response(200, json={"parents": [], "tree": {"sha": "b" * 40}})
+        if path.endswith("/git/trees/" + "b" * 40):
+            return httpx.Response(200, json={"tree": [{"path": "README.md"}], "truncated": False})
+        if path.endswith("/git/blobs"):
+            assert body["encoding"] == "base64"
+            return httpx.Response(201, json={"sha": "c" * 40})
+        if path.endswith("/git/trees"):
+            assert {f["path"] for f in body["tree"]} == {"app/main.py", "requirements.txt"}
+            return httpx.Response(201, json={"sha": "e" * 40})
+        if path.endswith("/git/commits"):
+            assert body["parents"] == ["a" * 40]
+            return httpx.Response(201, json={"sha": "d" * 40})
+        raise AssertionError((request.method, path))
+
+    backend = create(provider)
+    app = create_app(settings, backend=backend)
+    app.state.uploads.demo = False
+    app.state.uploads.owner_type = "User"
+    sid = app.state.sessions.create("1", "demo", "test-user-token")
+    csrf = app.state.sessions.get(sid).csrf
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("app/main.py", "from fastapi import FastAPI")
+        archive.writestr("requirements.txt", "fastapi==0.162.0")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        client.cookies.set(settings.cookie_name, sid)
+        client.headers.update({"Origin": "http://testserver", "X-CSRF-Token": csrf})
+        upload = client.post(
+            "/api/v1/uploads",
+            content=output.getvalue(),
+            headers={"Content-Type": "application/zip"},
+        )
+        assert upload.status_code == 201, upload.text
+        uid = upload.json()["upload_id"]
+        review = client.post(f"/api/v1/uploads/{uid}/review", json={"name": "hello-portal"})
+        assert review.status_code == 200, review.text
+        confirmed = client.post(
+            f"/api/v1/uploads/{uid}/confirm", json={"review_token": review.json()["review_token"]}
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        assert confirmed.json()["status"] == "uploaded"
+        assert client.post(f"/api/v1/uploads/{uid}/resume").json()["status"] == "uploaded"
+    assert mutations.count(("POST", "/user/repos")) == 1
+    assert not any("dispatch" in path or "workflows" in path for _, path in mutations)
