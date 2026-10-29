@@ -103,3 +103,95 @@ def test_selected_release_does_not_use_newest_run(pipeline_reader):
     backend, _, _, calls = pipeline_reader
     discover(backend, SimpleNamespace(user_id="1"), "orders", release_id="7")
     assert calls[1].endswith("/runs/42/attempts/2")
+
+
+def legacy_case(pipeline_reader):
+    import json
+    from pathlib import Path
+
+    from app.pipeline import LEGACY_PIN
+
+    backend, run, jobs, calls = pipeline_reader
+    entry, _, _ = backend.delivery_authorize(SimpleNamespace(user_id="1"), "orders", "dev")
+    entry.versions.workflow_commit = LEGACY_PIN
+    run["referenced_workflows"] = [
+        {
+            "path": f"demo/platform/.github/workflows/python-web-release.yml@{LEGACY_PIN}",
+            "sha": LEGACY_PIN,
+        }
+    ]
+    run["conclusion"] = "success"
+    jobs[:] = json.loads((Path(__file__).parent / "fixtures/legacy-release-jobs.json").read_text())
+    return backend, run, jobs, calls
+
+
+def test_actual_legacy_jobs_show_measured_checks_and_do_not_invent_source_scan(pipeline_reader):
+    backend, _, _, _ = legacy_case(pipeline_reader)
+    result = discover(
+        backend,
+        SimpleNamespace(user_id="1"),
+        "orders",
+        delivery={"status": "healthy", "security_verified": True},
+    )
+    assert [s["state"] for s in result["stages"]] == [
+        "passed",
+        "passed",
+        "passed",
+        "unknown",
+        "passed",
+        "passed",
+        "passed",
+        "passed",
+        "passed",
+    ]
+    assert "does not run" in result["stages"][3]["message"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing_arch", "duplicate_job", "duplicate_step", "scan_failure", "bundled_failure"],
+)
+def test_legacy_missing_ambiguous_and_failed_evidence_is_not_green(pipeline_reader, mutation):
+    backend, _, jobs, _ = legacy_case(pipeline_reader)
+    container = next(j for j in jobs if j["name"].endswith("container (arm64)"))
+    stage, expected = 5, "unknown"
+    if mutation == "missing_arch":
+        jobs.remove(container)
+    elif mutation == "duplicate_job":
+        jobs.append(container)
+    elif mutation == "duplicate_step":
+        container["steps"].append(
+            next(s for s in container["steps"] if s["name"] == "Build source-labelled candidate")
+        )
+    elif mutation == "scan_failure":
+        next(s for s in container["steps"] if s["name"] == "Scan candidate and generate SBOM")[
+            "conclusion"
+        ] = "failure"
+        stage, expected = 6, "failed"
+    else:
+        checks = next(j for j in jobs if j["name"].endswith(" / checks"))
+        next(
+            s
+            for s in checks["steps"]
+            if s["name"] == "Validate source in its own Python environment"
+        )["conclusion"] = "failure"
+        stage = 1
+    result = discover(backend, SimpleNamespace(user_id="1"), "orders")
+    assert result["stages"][stage]["state"] == expected
+
+
+def test_application_pipeline_looks_up_delivery_only_after_validating_run(pipeline_reader):
+    backend, run, _, _ = pipeline_reader
+    calls = []
+
+    def lookup(exact_run):
+        calls.append(exact_run["id"])
+        return {"status": "healthy", "security_verified": True}
+
+    result = discover(backend, SimpleNamespace(user_id="1"), "orders", delivery_lookup=lookup)
+    assert calls == [42]
+    assert result["stages"][8]["state"] == "passed"
+    run["repository"]["id"] = 999
+    with pytest.raises(PortalError):
+        discover(backend, SimpleNamespace(user_id="1"), "orders", delivery_lookup=lookup)
+    assert calls == [42]

@@ -16,6 +16,30 @@ class DeploymentService:
         self.config, self.backend, self.signer = config, backend, signer
         self.lock = threading.RLock()
 
+    def pipeline_status(self, session, app_id, run):
+        candidates = []
+        for rid, record in self.backend.delivery_records():
+            payload = self.verified(record, rid)
+            intent = payload["intent"]
+            if (
+                intent["requester_user_id"] == session.user_id
+                and intent["app_id"] == app_id
+                and intent["environment"] == "dev"
+                and intent["source_commit"] == run["head_sha"]
+                and str(intent["release_workflow_run_id"]) == str(run["id"])
+            ):
+                candidates.append(payload)
+        if not candidates:
+            return None
+        latest = max(candidates, key=lambda p: datetime.fromisoformat(p["intent"]["created_at"]))
+        entry, _revision, policy = self.backend.delivery_authorize(session, app_id, "dev")
+        evidence, _raw, _release = self.backend.admitted_release(
+            entry, latest["intent"]["release_id"], policy
+        )
+        if str(evidence.run_attempt) != str(run["run_attempt"]):
+            return None
+        return self.get(session, latest["intent"]["request_id"])
+
     def enabled(self):
         if not self.config.delivery_workflow_commit:
             raise PortalError(

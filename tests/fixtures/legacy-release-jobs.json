@@ -1,0 +1,601 @@
+[
+  {
+    "name": "validate / prepare",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Resolve pinned release helpers and require a default-branch event",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / validate / prepare",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Resolve immutable platform workflow and helper version",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / validate / checks",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install trusted helper dependencies",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Validate source in its own Python environment",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Scan source dependency lock",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / validate / container (arm64)",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install trusted helper dependencies",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build source-labelled candidate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify candidate runtime through the trusted helper",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Preserve exact tested candidate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Scan candidate and generate SBOM",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Bind candidate identity and exact scan/archive evidence",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / validate / container (amd64)",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install trusted helper dependencies",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build source-labelled candidate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify candidate runtime through the trusted helper",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Preserve exact tested candidate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Scan candidate and generate SBOM",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Bind candidate identity and exact scan/archive evidence",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / publish (amd64)",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run python -m pip install --require-hashes -r platform/requirements.txt",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify downloaded candidate bytes and source evidence",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Inspect actual loaded image without executing app-owned scripts",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish OCI platform manifest preserving tested config/layers",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify exact digest runtime then record platform publication",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / publish (arm64)",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run python -m pip install --require-hashes -r platform/requirements.txt",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify downloaded candidate bytes and source evidence",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Inspect actual loaded image without executing app-owned scripts",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish OCI platform manifest preserving tested config/layers",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify exact digest runtime then record platform publication",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  },
+  {
+    "name": "validate / release-index",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run python -m pip install --require-hashes -r platform/requirements.txt",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Combine only verified immutable platform references",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish multi-platform index without rebuilding",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Export exact OCI root and all referenced content",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify draft asset bytes before publishing the source release",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "run_id": 42
+  }
+]
