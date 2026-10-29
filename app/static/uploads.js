@@ -28,6 +28,7 @@ async function uploadView() {
   $("upload-detection").replaceChildren(); $("upload-exclusions").replaceChildren();
   $("upload-profile").replaceChildren(...Object.keys(state.session.resource_profiles).map((id) => new Option(id, id)));
   uploadProfileDescription();
+  setRuntimeForm("upload-", null);
 }
 function uploadProfileDescription() {
   const p = state.session?.resource_profiles[$("upload-profile").value];
@@ -53,6 +54,7 @@ function renderUpload(record) {
     const name = record.repository.full_name.split("/")[1];
     $("upload-app-id").value = name.toLowerCase().replaceAll("_", "-");
     $("upload-display").value = name;
+    setRuntimeForm("upload-", record.detection.stack ? {profile_id:"python312-multiservice",stack:record.detection.stack} : null);
   }
   $("recover-upload").hidden = !pendingUpload();
 }
@@ -102,7 +104,7 @@ $("recover-upload").addEventListener("click", () => action(async () => {
 $("upload-settings").addEventListener("submit", (event) => {
   event.preventDefault(); action(async () => {
     const proposedSettings = { repository_id: currentUpload.repository.repository_id, app_id: $("upload-app-id").value, display_name: $("upload-display").value,
-      owner_user_ids: [state.session.user_id], runtime: { profile_id: "python312-web", container_port: Number($("upload-port").value), health_path: $("upload-health").value, resource_profile_id: $("upload-profile").value } };
+      owner_user_ids: [state.session.user_id], runtime: runtimeFromForm("upload-") };
     const proposal = await api(`/api/v1/uploads/${currentUpload.upload_id}/preparation`, { method: "POST", body: JSON.stringify(proposedSettings) });
     uploadSettings = proposal.settings;
     $("upload-proposals").replaceChildren(node("h3", "Requirements to complete"), node("ul"));
@@ -132,6 +134,7 @@ $("upload-continue").addEventListener("click", () => action(async () => {
   }
   $("repository").value = settings.repository_id;
   $("app-id").value = settings.app_id; $("display-name").value = settings.display_name;
+  setRuntimeForm("", settings.runtime);
   $("port").value = settings.runtime.container_port; $("health-path").value = settings.runtime.health_path;
   $("resource-profile").value = settings.runtime.resource_profile_id; profileDescription();
   await validate();

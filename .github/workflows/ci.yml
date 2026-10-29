@@ -39,6 +39,7 @@ jobs:
         run: |
           node --check app/static/app.js
           node --check tests/pipeline-browser-smoke.cjs
+          node --check tests/multiservice-browser-smoke.cjs
           node --check tests/browser-smoke.cjs
           bash -n scripts/verify-container.sh
       - name: Build separate portal image

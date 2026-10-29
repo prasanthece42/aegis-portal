@@ -123,6 +123,189 @@
       "title": "Source",
       "type": "object"
     },
+    "StackDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "profile_id": {
+          "const": "python312-multiservice",
+          "default": "python312-multiservice",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "primary_service": {
+          "pattern": "^[a-z](?:[a-z0-9-]{0,20}[a-z0-9])?$",
+          "title": "Primary Service",
+          "type": "string"
+        },
+        "services": {
+          "maxProperties": 8,
+          "minProperties": 2,
+          "patternProperties": {
+            "^[a-z](?:[a-z0-9-]{0,20}[a-z0-9])?$": {
+              "$ref": "#/$defs/StackService"
+            }
+          },
+          "title": "Services",
+          "type": "object"
+        },
+        "dependencies": {
+          "const": "postgres17-redis7-nginx",
+          "default": "postgres17-redis7-nginx",
+          "title": "Dependencies",
+          "type": "string"
+        }
+      },
+      "required": [
+        "primary_service",
+        "services"
+      ],
+      "title": "StackDefinition",
+      "type": "object"
+    },
+    "StackRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "const": "python312-multiservice",
+          "default": "python312-multiservice",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "container_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Container Port",
+          "type": "integer"
+        },
+        "health_path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Health Path",
+          "type": "string"
+        },
+        "resource_profile_id": {
+          "pattern": "^[a-z][a-z0-9-]{0,39}$",
+          "title": "Resource Profile Id",
+          "type": "string"
+        },
+        "stack": {
+          "$ref": "#/$defs/StackDefinition"
+        },
+        "credentials_secret": {
+          "pattern": "^[a-z][a-z0-9-]{0,62}$",
+          "title": "Credentials Secret",
+          "type": "string"
+        },
+        "environment": {
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[a-z](?:[a-z0-9-]{0,20}[a-z0-9])?$": {
+              "patternProperties": {
+                "^[A-Z][A-Z0-9_]{0,63}$": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "title": "Environment",
+          "type": "object"
+        }
+      },
+      "required": [
+        "container_port",
+        "health_path",
+        "resource_profile_id",
+        "stack",
+        "credentials_secret"
+      ],
+      "title": "StackRuntime",
+      "type": "object"
+    },
+    "StackService": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "default": ".",
+          "title": "Context",
+          "type": "string"
+        },
+        "dockerfile": {
+          "default": "Dockerfile",
+          "title": "Dockerfile",
+          "type": "string"
+        },
+        "build_args": {
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[A-Z][A-Z0-9_]{0,63}$": {
+              "type": "string"
+            }
+          },
+          "title": "Build Args",
+          "type": "object"
+        },
+        "port": {
+          "default": 8000,
+          "maximum": 65535,
+          "minimum": 1024,
+          "title": "Port",
+          "type": "integer"
+        },
+        "health_path": {
+          "default": "/ready",
+          "title": "Health Path",
+          "type": "string"
+        },
+        "replicas": {
+          "default": 1,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Replicas",
+          "type": "integer"
+        },
+        "env": {
+          "maxProperties": 32,
+          "patternProperties": {
+            "^[A-Z][A-Z0-9_]{0,63}$": {
+              "type": "string"
+            }
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "service_env": {
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[A-Z][A-Z0-9_]{0,63}$": {
+              "pattern": "^[a-z](?:[a-z0-9-]{0,20}[a-z0-9])?$",
+              "type": "string"
+            }
+          },
+          "title": "Service Env",
+          "type": "object"
+        },
+        "secret_env": {
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[A-Z][A-Z0-9_]{0,63}$": {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "type": "string"
+            }
+          },
+          "title": "Secret Env",
+          "type": "object"
+        }
+      },
+      "title": "StackService",
+      "type": "object"
+    },
     "Target": {
       "additionalProperties": false,
       "properties": {
@@ -255,7 +438,15 @@
       "$ref": "#/$defs/Access"
     },
     "runtime": {
-      "$ref": "#/$defs/Runtime"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Runtime"
+        },
+        {
+          "$ref": "#/$defs/StackRuntime"
+        }
+      ],
+      "title": "Runtime"
     },
     "versions": {
       "$ref": "#/$defs/Versions"

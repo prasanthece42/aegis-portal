@@ -15,6 +15,8 @@ import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 
+from aegis_platform.canonical import strict_json
+from aegis_platform.stack import StackDefinition
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.errors import PortalError
@@ -132,13 +134,30 @@ def inspect_zip(body: bytes) -> dict:
     python = any(n.endswith(".py") for n in files) and any(
         n in files for n in ("requirements.txt", "pyproject.toml")
     )
+    stack = None
+    if "aegis-stack.json" in files:
+        try:
+            stack = StackDefinition.model_validate(
+                strict_json(base64.b64decode(files["aegis-stack.json"]))
+            ).model_dump()
+        except (ValueError, TypeError) as exc:
+            raise PortalError(
+                422,
+                "STACK_INVALID",
+                "Fix the multi-service definition in aegis-stack.json before uploading.",
+            ) from exc
     return {
         "files": files,
         "excluded": excluded,
         "blocked": blocked,
         "python_supported": python,
         "detection": {
-            "runtime": "python312-web" if python else "unsupported",
+            "runtime": "python312-multiservice"
+            if stack
+            else "python312-web"
+            if python
+            else "unsupported",
+            **({"stack": stack} if stack else {}),
             "dockerfile_present": "Dockerfile" in files,
             "dependency_files": [
                 n

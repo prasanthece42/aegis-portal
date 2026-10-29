@@ -3,6 +3,8 @@
 import threading
 from datetime import UTC, datetime
 
+from aegis_platform.stack import PROFILE
+
 from app.config import LiveConfig
 from app.contracts import CatalogEntry, RegistrationFields, RegistrationSubmission
 from app.errors import PortalError
@@ -35,12 +37,34 @@ class RegistrationService:
             )
         if fields.runtime.resource_profile_id not in self.config.resource_profiles:
             raise PortalError(422, "PROFILE_UNSUPPORTED", "Choose an approved resource profile.")
-        return self.backend.source(session, fields.repository_id)
+        source = self.backend.source(session, fields.repository_id)
+        if fields.runtime.profile_id == PROFILE:
+            if not self.config.multiservice_versions:
+                raise PortalError(
+                    503,
+                    "STACK_SETUP_REQUIRED",
+                    "An operator must activate the multi-service workflow and chart pins.",
+                )
+            definition = self.backend.stack_definition(source)
+            if definition != fields.runtime.stack.model_dump():
+                raise PortalError(
+                    409,
+                    "STACK_SOURCE_CHANGED",
+                    "Reload the stack definition from the selected source revision.",
+                )
+        return source
 
     def policy_hash(self) -> str:
         return digest(self.config.model_dump())
 
     def setup_review(self, fields, source):
+        if fields.runtime.profile_id == PROFILE:
+            raise PortalError(
+                409,
+                "STACK_OPERATOR_SETUP_REQUIRED",
+                "Multi-service target setup requires a separate platform-operator review. "
+                "Submit registration without combined DEV preparation.",
+            )
         if not hasattr(self.backend, "registration_setup_plan"):
             return None, None
         plan, existing = self.backend.registration_setup_plan(self.entry(fields, source), source)
@@ -150,7 +174,11 @@ class RegistrationService:
                     "deployer_user_ids_by_environment": {"dev": fields.owner_user_ids},
                 },
                 "runtime": fields.runtime.model_dump(),
-                "versions": self.config.versions.model_dump(),
+                "versions": (
+                    self.config.multiservice_versions
+                    if fields.runtime.profile_id == PROFILE
+                    else self.config.versions
+                ).model_dump(),
                 "environments": {
                     "dev": {
                         "delivery_mode": "manual",

@@ -47,7 +47,13 @@ def discover(backend, session, app_id, *, release_id=None, delivery=None, delive
             token,
         ).json()
     pin = entry.versions.workflow_commit
-    expected = f"{policy.platform_repository}/.github/workflows/python-web-release.yml@{pin}"
+    family = (
+        "python-stack"
+        if getattr(getattr(entry, "runtime", None), "profile_id", "python312-web")
+        == "python312-multiservice"
+        else "python-web"
+    )
+    expected = f"{policy.platform_repository}/.github/workflows/{family}-release.yml@{pin}"
     if (
         str(run.get("repository", {}).get("id")) != entry.source.repository_id
         or run.get("head_branch") != entry.source.default_branch
@@ -74,7 +80,9 @@ def discover(backend, session, app_id, *, release_id=None, delivery=None, delive
     if delivery is None and delivery_lookup is not None:
         delivery = delivery_lookup(run)
     complete = run.get("status") == "completed"
-    result = dev_pipeline(jobs, delivery=delivery, complete=complete)
+    result = dev_pipeline(
+        jobs, delivery=delivery, complete=complete, stack=family == "python-stack"
+    )
     if pin == LEGACY_PIN:
         legacy_stages(result, jobs, complete)
     result.update(

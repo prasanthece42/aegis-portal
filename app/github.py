@@ -547,3 +547,19 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub, SetupGitHub):
 
     def close(self):
         self.client.close()
+
+    def stack_definition(self, source):
+        from aegis_platform.stack import StackDefinition
+
+        token = self.installation_token(
+            source["installation_id"], [source["repository_id"]], {"contents": "read"}
+        )
+        raw = self.file(
+            source["full_name"], "aegis-stack.json", source["source_commit"], token, max_size=24576
+        )
+        try:
+            return StackDefinition.model_validate(strict_json(raw)).model_dump()
+        except (ValueError, TypeError) as exc:
+            raise PortalError(
+                422, "STACK_INVALID", "The selected source needs a valid aegis-stack.json."
+            ) from exc
