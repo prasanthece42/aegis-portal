@@ -327,7 +327,7 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub, SetupGitHub):
             "record.json",
             sha,
             token,
-            max_size=65536 if registration_id.startswith("setup-") else 32768,
+            max_size=65536 if registration_id.startswith(("setup-", "reg-")) else 32768,
         )
         if data is None:
             raise PortalError(503, "JOURNAL_INVALID", "Request journal is incomplete.")
@@ -468,7 +468,7 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub, SetupGitHub):
                 "title": "Register " + entry["app_id"],
                 "body": "Portal registration: "
                 + registration_id
-                + "\n\nRequires platform review, pipeline onboarding and operator target setup. "
+                + "\n\nRequires platform review, pipeline validation and DEV preparation. "
                 "Does not deploy workloads.",
             },
             allow=(422,),

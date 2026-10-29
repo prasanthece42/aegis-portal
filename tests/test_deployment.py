@@ -238,3 +238,34 @@ def test_pipeline_discovers_only_signed_matching_principal_app_source_and_run(
     else:
         result = service.pipeline_status(session, "orders-api", run)
         assert (result is not None) == (mismatch is None)
+
+
+def test_latest_journey_delivery_is_durable_and_rechecks_current_access(delivery, monkeypatch):
+    client, app, _, _ = delivery
+    ids = []
+    for release_id in ("700", "701"):
+        response = client.post(
+            "/api/v1/deployment-requests",
+            json=confirm(client, release_id),
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert response.status_code == 202
+        ids.append(response.json()["request_id"])
+    service = app.state.delivery
+    monkeypatch.setattr(
+        service.backend,
+        "delivery_records",
+        lambda: [(rid, service.backend.journal(rid)[1]) for rid in ids],
+        raising=False,
+    )
+    session = next(iter(app.state.sessions.records.values()))
+    result = service.latest_for_app(session, "orders-api")
+    assert result["request_id"] == ids[-1] and result["release_id"] == "701"
+    assert service.latest_for_app(session, "another-app") is None
+    monkeypatch.setattr(
+        service.backend,
+        "delivery_authorize",
+        lambda *_: (_ for _ in ()).throw(PortalError(403, "DENIED", "Access revoked")),
+    )
+    with pytest.raises(PortalError, match="revoked"):
+        service.latest_for_app(session, "orders-api")

@@ -139,12 +139,34 @@ def make_plan(entry, catalog, delivery, bootstrap, policy, source_commit):
     return plan
 
 
+def setup_payload(payload):
+    """Extract an explicitly reviewed plan from a signed registration or setup record."""
+    if payload.get("kind") == "dev_setup_request":
+        return payload
+    nested = payload.get("setup_intent")
+    if not nested:
+        raise ValueError("Not an explicit DEV setup request")
+    intent = SetupIntent.model_validate(nested)
+    rid = payload.get("registration_id", "")
+    if (
+        not re.fullmatch(r"reg-[0-9a-f]{64}", rid)
+        or intent.setup_id != "setup-" + rid[4:]
+        or any(
+            payload.get(k) != getattr(intent, k)
+            for k in ("issuer_id", "platform_repository_id", "requester_user_id", "created_at")
+        )
+        or payload.get("idempotency_key_hash") != intent.idempotency_hash
+        or payload.get("source_commit") != intent.plan.source_commit
+        or digest(payload.get("catalog_entry")) != intent.plan.catalog_entry_hash
+    ):
+        raise ValueError("Registration and setup authorization differ")
+    return nested
+
+
 def verify_setup(record, trust, policy, now=None, *, admission=True, require_fresh=True):
     if set(record) != {"payload", "envelope"}:
         raise ValueError("Invalid setup envelope")
-    if record["payload"].get("kind") != "dev_setup_request":
-        raise ValueError("Not an explicit DEV setup request")
-    intent = SetupIntent.model_validate(record["payload"])
+    intent = SetupIntent.model_validate(setup_payload(record["payload"]))
     env = record["envelope"]
     matches = [
         i

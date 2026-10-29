@@ -244,3 +244,7 @@ After catalog approval, choose **Prepare for DEV** to review and authorize autom
 and target preparation. The enrolled operator service carries out reviewed setup and CI; the
 portal shows approvals and real readiness. Selecting and confirming a DEV release remains
 separate. See [authority, operator service and recovery](docs/guided-dev-setup.md).
+
+## Guided onboarding
+
+New supported Python applications use one journey from combined registration/setup review to measured DEV health. See [the guided onboarding contract](docs/guided-onboarding.md). Owner reviews and deployment confirmation remain explicit; intermediate preparation, build and progress refresh are automatic.

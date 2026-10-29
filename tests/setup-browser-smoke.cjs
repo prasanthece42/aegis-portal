@@ -33,7 +33,7 @@ const targetFiles = [{ path: 'clusters/kind-local/bootstrap/orders-api/dev/names
     await page.goto(base, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /Enter local demo/ }).click();
     await page.locator('#applications').waitFor({ state: 'visible' });
-    await page.getByRole('button', { name: 'Prepare for DEV →', exact: true }).click();
+    await page.evaluate(() => setupView('orders-api'));
     await page.locator('#dev-setup').waitFor({ state: 'visible' });
     await page.locator('#setup-plan').click();
     await page.locator('#setup-confirm').waitFor({ state: 'visible' });
@@ -44,7 +44,7 @@ const targetFiles = [{ path: 'clusters/kind-local/bootstrap/orders-api/dev/names
     await page.locator('#error').waitFor({ state: 'visible' });
     await page.reload({ waitUntil: 'networkidle' });
     await page.locator('#applications').waitFor({ state: 'visible' });
-    await page.getByRole('button', { name: 'Prepare for DEV →', exact: true }).click();
+    await page.evaluate(() => setupView('orders-api'));
     await page.locator('#setup-approve').waitFor({ state: 'visible' });
     assert.equal(confirmations, 1);
     await page.locator('#setup-approve').click();

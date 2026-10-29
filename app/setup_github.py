@@ -27,6 +27,36 @@ def plan_bytes_equal(path, actual, expected):
 
 
 class SetupGitHub:
+    def registration_setup_plan(self, raw_entry, source):
+        from app.contracts import CatalogEntry
+
+        entry = CatalogEntry.model_validate(raw_entry)
+        revision, delivery = self.catalog_snapshot()
+        policy = self.setup_policy(revision, delivery)
+        repo, token = self.config.platform_repository, self.platform_token()
+        bootstrap = strict_json(self.file(repo, "policies/bootstrap.json", revision, token))
+        cluster = Cluster.model_validate(
+            strict_json(
+                self.file(repo, f"catalog/clusters/{policy.cluster_id}.json", revision, token)
+            )
+        )
+        catalog_policy = CatalogPolicy.model_validate(
+            strict_json(self.file(repo, "policies/catalog.json", revision, token))
+        )
+        plan = make_plan(
+            entry,
+            Catalog([entry], [cluster], catalog_policy),
+            delivery,
+            bootstrap,
+            policy,
+            source["source_commit"],
+        )
+        return plan, self.setup_files(entry, plan)
+
+    def registration_setup_journal(self, setup_id):
+        raw = self.journal("reg-" + setup_id[6:])
+        return raw if raw and raw[1].get("payload", {}).get("setup_intent") else None
+
     def setup_policy_token(self):
         return self.installation_token(
             self.config.platform_installation_id,
@@ -316,6 +346,14 @@ class SetupGitHub:
                 max_size=65536,
             )
             result.append((rid, strict_json(raw)))
+        for rid in self.journal_ids():
+            raw = self.journal(rid)
+            if raw and raw[1].get("payload", {}).get("setup_intent"):
+                result.append(("setup-" + rid[4:], raw[1]))
+        if len(result) > 100:
+            raise PortalError(
+                503, "SETUP_DISCOVERY_LIMIT", "Preparation history exceeds its budget."
+            )
         return result
 
     def setup_ci_result(self, entry, source_commit, proposal):

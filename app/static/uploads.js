@@ -134,4 +134,5 @@ $("upload-continue").addEventListener("click", () => action(async () => {
   $("app-id").value = settings.app_id; $("display-name").value = settings.display_name;
   $("port").value = settings.runtime.container_port; $("health-path").value = settings.runtime.health_path;
   $("resource-profile").value = settings.runtime.resource_profile_id; profileDescription();
+  await validate();
 }));

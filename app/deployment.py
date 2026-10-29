@@ -16,6 +16,23 @@ class DeploymentService:
         self.config, self.backend, self.signer = config, backend, signer
         self.lock = threading.RLock()
 
+    def latest_for_app(self, session, app_id):
+        self.backend.delivery_authorize(session, app_id, "dev")
+        candidates = []
+        for rid, record in self.backend.delivery_records():
+            payload = self.verified(record, rid)
+            intent = payload["intent"]
+            if (
+                intent["app_id"] == app_id
+                and intent["environment"] == "dev"
+                and intent["requester_user_id"] == session.user_id
+            ):
+                candidates.append(intent)
+        if not candidates:
+            return None
+        latest = max(candidates, key=lambda i: datetime.fromisoformat(i["created_at"]))
+        return self.get(session, latest["request_id"])
+
     def pipeline_status(self, session, app_id, run):
         candidates = []
         for rid, record in self.backend.delivery_records():

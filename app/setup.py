@@ -10,7 +10,7 @@ from aegis_platform.canonical import digest
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.errors import PortalError
-from app.setup_contracts import SetupIntent
+from app.setup_contracts import SetupIntent, setup_payload
 from app.setup_github import plan_bytes_equal
 
 
@@ -176,7 +176,7 @@ class SetupService:
 
     def verified(self, record, rid):
         try:
-            intent = SetupIntent.model_validate(self.signer.verify(record))
+            intent = SetupIntent.model_validate(setup_payload(self.signer.verify(record)))
             if (
                 intent.setup_id != rid
                 or intent.issuer_id != self.backend.config.issuer_id
@@ -194,6 +194,8 @@ class SetupService:
             raise PortalError(404, "SETUP_NOT_FOUND", "Setup is unavailable.")
         entry, revision, delivery, policy, current = context or self.context(session, app_id)
         raw = self.backend.journal(rid)
+        if not raw and hasattr(self.backend, "registration_setup_journal"):
+            raw = self.backend.registration_setup_journal(rid)
         if not raw:
             raise PortalError(404, "SETUP_NOT_FOUND", "Setup is unavailable.")
         intent = self.verified(raw[1], rid)

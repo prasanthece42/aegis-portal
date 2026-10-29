@@ -7,6 +7,8 @@ from app.config import LiveConfig
 from app.contracts import CatalogEntry, RegistrationFields, RegistrationSubmission
 from app.errors import PortalError
 from app.security import Session, Signer, digest, operation_id
+from app.setup import file_rows
+from app.setup_contracts import SetupIntent
 
 
 class RegistrationService:
@@ -37,6 +39,30 @@ class RegistrationService:
 
     def policy_hash(self) -> str:
         return digest(self.config.model_dump())
+
+    def setup_review(self, fields, source):
+        if not hasattr(self.backend, "registration_setup_plan"):
+            return None, None
+        plan, existing = self.backend.registration_setup_plan(self.entry(fields, source), source)
+        files = file_rows(plan.workflow_files, existing["source"])
+        targets = file_rows(plan.target_files, existing["target"])
+        blockers = [
+            "Existing file requires a maintainer decision: " + f["path"]
+            for f in files + targets
+            if f["status"] == "conflict"
+        ]
+        blockers += [
+            "Missing required source file: " + p
+            for p in ("Dockerfile", "requirements.txt", "requirements-prod.txt")
+            if existing["source"].get(p) is None
+        ]
+        return plan, {
+            "workflow_files": files,
+            "target_files": targets,
+            "blockers": blockers,
+            "notice": "Submitting authorizes these proposals after catalog approval. "
+            "Required owner reviews remain separate. Nothing deploys.",
+        }
 
     def unique(self, fields: RegistrationFields, exclude: str | None = None):
         entries = [
@@ -71,6 +97,7 @@ class RegistrationService:
             source = self.authorize(session, fields)
             self.unique(fields)
             detection = self.backend.detection(source)
+            setup_plan, setup_review = self.setup_review(fields, source)
             payload = fields.model_dump()
             token = self.signer.review_token(
                 {
@@ -79,6 +106,7 @@ class RegistrationService:
                     "payload_hash": digest(payload),
                     "source_commit": source["source_commit"],
                     "policy_hash": self.policy_hash(),
+                    **({"setup_plan_hash": digest(setup_plan.model_dump())} if setup_plan else {}),
                 }
             )
             return {
@@ -88,6 +116,7 @@ class RegistrationService:
                 "delivery": {"environment": "dev", "mode": "manual"},
                 "review_token": token,
                 "expires_in_seconds": 300,
+                "automatic_setup": setup_review,
             }
 
     def entry(self, fields: RegistrationFields, source: dict) -> dict:
@@ -160,6 +189,11 @@ class RegistrationService:
                     return self.result(payload)
             else:
                 self.unique(fields)
+                setup_plan, setup_review = self.setup_review(fields, source)
+                if setup_review and setup_review["blockers"]:
+                    raise PortalError(
+                        409, "SETUP_BLOCKED", "Resolve the setup requirements before submitting."
+                    )
                 try:
                     review = self.signer.read_review(submission.review_token)
                 except (ValueError, KeyError, TypeError) as exc:
@@ -174,6 +208,7 @@ class RegistrationService:
                     "payload_hash": digest(fields.model_dump()),
                     "source_commit": source["source_commit"],
                     "policy_hash": self.policy_hash(),
+                    **({"setup_plan_hash": digest(setup_plan.model_dump())} if setup_plan else {}),
                 }
                 if {k: review.get(k) for k in expected} != expected:
                     raise PortalError(
@@ -196,6 +231,16 @@ class RegistrationService:
                     "catalog_entry": self.entry(fields, source),
                     "binding": None,
                 }
+                if setup_plan:
+                    payload["setup_intent"] = SetupIntent(
+                        setup_id="setup-" + rid[4:],
+                        issuer_id=self.config.issuer_id,
+                        platform_repository_id=self.config.platform_repository_id,
+                        requester_user_id=session.user_id,
+                        created_at=payload["created_at"],
+                        idempotency_hash=payload["idempotency_key_hash"],
+                        plan=setup_plan,
+                    ).model_dump()
                 if not self.backend.save_journal(rid, self.signer.seal(payload), None):
                     existing = self.backend.journal(rid)
                     if existing is None:
@@ -269,6 +314,7 @@ class RegistrationService:
                 {"name": "Validated release", "status": "not_verified", "actor": "Application CI"},
             ],
             "deployment_available": False,
+            "automatic_setup": bool(payload.get("setup_intent")),
         }
 
     def get(self, session: Session, rid: str) -> dict:

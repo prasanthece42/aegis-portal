@@ -225,6 +225,11 @@ class GitHubTransport:
             if branch in self.refs:
                 return httpx.Response(200, json={"object": {"sha": self.refs[branch]}})
             return httpx.Response(404)
+        if "/git/refs/heads/" in path and method == "PATCH":
+            assert body["force"] is False
+            branch = path.split("/git/refs/heads/", 1)[1]
+            self.refs[branch] = body["sha"]
+            return httpx.Response(200, json={})
         if path.endswith("/git/refs") and method == "POST":
             branch = body["ref"].removeprefix("refs/heads/")
             if branch in self.refs:
@@ -236,11 +241,16 @@ class GitHubTransport:
                     503, "GITHUB_UNAVAILABLE", "Simulated lost confirmation response", True
                 )
             return httpx.Response(201, json={})
-        if "git/matching-refs/heads/portal-setups/" in path:
+        if (
+            "git/matching-refs/heads/portal-setups/" in path
+            or "git/matching-refs/heads/portal-registrations/" in path
+        ):
             return httpx.Response(
                 200,
                 json=[
-                    {"ref": "refs/heads/" + p, "object": {"sha": v}} for p, v in self.refs.items()
+                    {"ref": "refs/heads/" + p, "object": {"sha": v}}
+                    for p, v in self.refs.items()
+                    if p.startswith(path.split("/git/matching-refs/heads/", 1)[1])
                 ],
             )
         if path.endswith("/actions/runs"):
@@ -905,3 +915,185 @@ def test_safe_apply_verifies_actual_server_state_after_submission(
     with pytest.raises(ValueError, match="Observed target permissions"):
         operator.service.safe_apply(project, setup_case.entry)
     assert len(calls) == 2
+
+
+def guided_registration(client, app, fields, monkeypatch):
+    backend = app.state.service.backend
+    app.state.service.config = backend.config
+    monkeypatch.setattr(backend, "catalog", lambda: [])
+    monkeypatch.setattr(
+        backend,
+        "registration_pr",
+        lambda *_: {
+            "number": 7,
+            "url": "https://github.com/demo/aegis-platform/pull/7",
+            "state": "open",
+        },
+    )
+    monkeypatch.setattr(backend, "registration_status", lambda b: {**b, "merged": False})
+    preview = client.post("/api/v1/registration-validations", json=fields)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["automatic_setup"]["blockers"] == []
+    result = client.post(
+        "/api/v1/registrations",
+        json={**fields, "review_token": preview.json()["review_token"]},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert result.status_code == 201, result.text
+    return result.json(), preview.json()
+
+
+def test_registration_carries_exact_reviewed_plan_and_recovers_it_as_setup(
+    setup_portal, setup_case, fields, monkeypatch
+):
+    client, app, _ = setup_portal
+    result, preview = guided_registration(client, app, fields, monkeypatch)
+    assert result["automatic_setup"] is True
+    rid = result["registration_id"]
+    raw = app.state.service.backend.journal(rid)[1]
+    intent, _issuer = verify_setup(
+        raw, trust_for(app.state.service.signer, setup_case), setup_case.policy
+    )
+    assert intent.setup_id == "setup-" + rid[4:]
+    assert intent.plan.workflow_files == {
+        f["path"]: f["content"] for f in preview["automatic_setup"]["workflow_files"]
+    }
+    response = client.get(f"/api/v1/applications/orders-api/dev-setups/{intent.setup_id}")
+    assert response.status_code == 200, response.text
+    assert response.json()["setup_id"] == intent.setup_id
+    assert not any("/pulls" in p and m == "POST" for m, p, _ in setup_portal[2].calls)
+
+
+@pytest.mark.parametrize(
+    "attack", ["nested_tamper", "root_rebind", "source_changed", "entry_changed", "missing_consent"]
+)
+def test_nested_registration_setup_requires_bound_signature_and_exact_consent(
+    setup_portal, setup_case, fields, monkeypatch, attack
+):
+    client, app, _ = setup_portal
+    result, _ = guided_registration(client, app, fields, monkeypatch)
+    raw = deepcopy(app.state.service.backend.journal(result["registration_id"])[1])
+    payload = raw["payload"]
+    if attack == "nested_tamper":
+        payload["setup_intent"]["plan"]["namespace"] = "foreign"
+    else:
+        if attack == "root_rebind":
+            payload["requester_user_id"] = "999"
+        elif attack == "source_changed":
+            payload["source_commit"] = "f" * 40
+        elif attack == "entry_changed":
+            payload["catalog_entry"]["runtime"]["container_port"] = 9000
+        else:
+            payload.pop("setup_intent")
+        raw = app.state.service.signer.seal(payload)
+    with pytest.raises(ValueError):
+        verify_setup(raw, trust_for(app.state.service.signer, setup_case), setup_case.policy)
+
+
+def test_setup_change_between_registration_preview_and_confirm_requires_new_review(
+    setup_portal, fields, monkeypatch
+):
+    client, app, transport = setup_portal
+    backend = app.state.service.backend
+    app.state.service.config = backend.config
+    monkeypatch.setattr(backend, "catalog", lambda: [])
+    preview = client.post("/api/v1/registration-validations", json=fields)
+    assert preview.status_code == 200
+    transport.files[("demo/aegis-platform", "policies/portal-setup.json")] = canonical(
+        {**transport.case.policy.model_dump(), "operator_user_ids": ["1", "2"]}
+    )
+    result = client.post(
+        "/api/v1/registrations",
+        json={**fields, "review_token": preview.json()["review_token"]},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert result.status_code in {409, 503}
+    assert not transport.refs
+
+
+def registration_payload(case, intent):
+    return {
+        "registration_id": "reg-" + intent.setup_id[6:],
+        "issuer_id": intent.issuer_id,
+        "platform_repository_id": intent.platform_repository_id,
+        "requester_user_id": intent.requester_user_id,
+        "created_at": intent.created_at,
+        "idempotency_key_hash": intent.idempotency_hash,
+        "source_commit": intent.plan.source_commit,
+        "catalog_entry": case.entry.model_dump(),
+        "policy_hash": digest(case.config.model_dump()),
+        "setup_intent": intent.model_dump(),
+        "binding": {"number": 1},
+    }
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        None,
+        "no_approval",
+        "wrong_head",
+        "unrelated_file",
+        "revoked_onboarding",
+        "source_access",
+        "source_changed",
+        "wrong_branch",
+        "foreign_author",
+    ],
+)
+def test_worker_merges_only_exact_reviewed_catalog_after_current_grants(
+    operator, setup_case, attack
+):
+    service, case = operator.service, setup_case
+    configuration = {"configuration": case.config.model_dump()}
+    platform = Repo(
+        "demo/aegis-platform", 900, {"policies/portal-system.json": canonical(configuration)}
+    )
+    payload = registration_payload(case, operator.intent)
+    branch = "portal-onboarding/" + payload["registration_id"]
+    path = "catalog/apps/orders-api.json"
+    service.ensure_pr(
+        platform,
+        platform.bot(),
+        branch,
+        "main",
+        {path: canonical(case.entry.model_dump()).decode()},
+        title="Register orders-api",
+    )
+    service.worker.platform = platform
+    service.worker.source_factory = lambda _: operator.source
+    original_repo = operator.source.repo
+    operator.source.repo = lambda method, path, data=None: (
+        {"id": 101, "full_name": "demo/orders-api", "private": False, "default_branch": "main"}
+        if path == ""
+        else original_repo(method, path, data)
+    )
+    operator.source.pages = lambda *_a, **_k: [
+        {"id": 1, "permissions": {"push": attack != "source_access"}}
+    ]
+    if attack != "no_approval":
+        platform.approve(head="0" * 40 if attack == "wrong_head" else None)
+    if attack == "unrelated_file":
+        platform.snapshots[platform.pr["head"]["sha"]]["policies/unsafe.json"] = b"{}"
+    elif attack == "revoked_onboarding":
+        configuration["configuration"]["onboarding_user_ids"] = ["2"]
+        platform.snapshots[platform.head]["policies/portal-system.json"] = canonical(configuration)
+    elif attack == "source_changed":
+        operator.source.head = "f" * 40
+    elif attack == "wrong_branch":
+        platform.pr["head"]["ref"] = "unrelated"
+    elif attack == "foreign_author":
+        platform.pr["user"]["id"] = 999
+    draft = Catalog([], list(case.catalog.clusters.values()), case.catalog.policy)
+    with pytest.raises(Pending if attack in {None, "no_approval", "wrong_head"} else ValueError):
+        service.merge_registration(
+            payload,
+            operator.intent,
+            operator.issuer,
+            case.policy,
+            draft,
+            case.delivery,
+            case.bootstrap,
+        )
+    assert bool(platform.pr.get("merged_at")) == (attack is None)
+    assert operator.target.pr is None and not operator.applied
