@@ -156,12 +156,21 @@ def create_gateway(origin, forward, *, transport=None):
             return JSONResponse(
                 {"error": {"message": "Unrecognized portal origin."}}, status_code=400
             )
+        zip_upload = request.method == "POST" and request.url.path == "/api/v1/uploads"
+        limit = 5 * 1024 * 1024 if zip_upload else 32768
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > 32768:
+            if len(body) > limit:
                 return JSONResponse(
-                    {"error": {"message": "Request exceeds 32 KiB."}}, status_code=413
+                    {
+                        "error": {
+                            "message": "ZIP exceeds 5 MiB."
+                            if zip_upload
+                            else "Request exceeds 32 KiB."
+                        }
+                    },
+                    status_code=413,
                 )
         port = forward.port
         if port is None:

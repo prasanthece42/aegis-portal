@@ -20,9 +20,10 @@ from app.delivery_github import DeliveryGitHub
 from app.errors import PortalError
 from app.owner_github import OwnerGitHub
 from app.security import Session, b64, canonical, strict_json
+from app.upload_github import UploadGitHub
 
 
-class GitHub(OwnerGitHub, DeliveryGitHub):
+class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub):
     def __init__(self, config: LiveConfig, client: httpx.Client | None = None):
         self.config = config
         self.client = client or httpx.Client(timeout=15, follow_redirects=False)

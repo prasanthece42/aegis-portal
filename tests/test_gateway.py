@@ -89,3 +89,24 @@ def test_gateway_bounds_upstream_responses():
 
     with gateway(upstream) as browser:
         assert browser.get("/api/v1/applications").status_code == 503
+
+
+def test_gateway_allows_bounded_zip_uploads_only_on_upload_endpoint():
+    seen = []
+
+    def upstream(request):
+        seen.append(request)
+        assert request.headers["content-type"] == "application/zip"
+        assert len(request.content) == 65536
+        return httpx.Response(201, stream=httpx.ByteStream(b'{"inspected":true}'))
+
+    with gateway(upstream) as browser:
+        response = browser.post(
+            "/api/v1/uploads", content=b"x" * 65536, headers={"Content-Type": "application/zip"}
+        )
+        assert response.status_code == 201
+        assert (
+            browser.post("/api/v1/uploads", content=b"x" * (5 * 1024 * 1024 + 1)).status_code == 413
+        )
+        assert browser.post("/api/v1/registrations", content=b"x" * 65536).status_code == 413
+    assert len(seen) == 1
