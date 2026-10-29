@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
 let pipelineSelection = null;
 let pipelineGeneration = 0;
-const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring", "pipeline", "upload"];
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring", "pipeline", "upload", "dev-setup"];
 
 function node(tag, text, cls) {
   const element = document.createElement(tag);
@@ -14,7 +14,7 @@ function node(tag, text, cls) {
 function show(name) {
   for (const id of sections) $(id).hidden = id !== name;
   $("error").hidden = true;
-  $("nav-apps").classList.toggle("active", name === "applications" || name === "progress");
+  $("nav-apps").classList.toggle("active", name === "applications" || name === "progress" || name === "dev-setup");
   $("nav-register").classList.toggle("active", name === "registration");
   $("nav-monitoring").classList.toggle("active", name === "monitoring");
   $("nav-platform").classList.toggle("active", name === "platform" || name === "workflow-review");
@@ -70,6 +70,7 @@ function renderIdentity() {
   $("nav-monitoring").hidden = !state.session;
   if (!state.session) {
     if (typeof clearUpload === "function") clearUpload();
+    if (typeof clearSetup === "function") clearSetup();
     pipelineGeneration++;
     pipelineSelection = null;
     $("pipeline-stages").replaceChildren();
@@ -121,7 +122,9 @@ async function applications() {
     if (app.access.deployer_user_ids_by_environment.dev?.includes(state.session.user_id)) {
       const pipeline = node("button", "DEV pipeline →", "secondary");
       pipeline.addEventListener("click", () => action(() => pipelineView(app.app_id)));
-      controls.append(pipeline);
+      const prepare = node("button", "Prepare for DEV →", "secondary");
+      prepare.addEventListener("click", () => action(() => setupView(app.app_id)));
+      controls.append(prepare, pipeline);
     }
     row.append(content, controls); $("managed-applications").append(row);
   }
@@ -132,7 +135,7 @@ async function applications() {
     content.append(node("h3", item.display_name), node("p", `${item.app_id} · DEV · Not deployed`));
     const actions = node("div", undefined, "row-action");
     const catalogState = item.requirements[0].status;
-    const label = catalogState === "closed_unmerged" ? "Registration closed" : catalogState === "approved" ? "Setup incomplete" : "Onboarding pending";
+    const label = catalogState === "closed_unmerged" ? "Registration closed" : catalogState === "approved" ? "Catalog approved" : "Onboarding pending";
     actions.append(node("span", label, "pill neutral"));
     const view = node("button", "View setup →", "text-button");
     view.addEventListener("click", () => action(() => progress(item.registration_id)));
@@ -324,11 +327,15 @@ async function recoverPending() {
 const statusLabels = {
   pending_review: "Awaiting review", approved: "Approved", closed_unmerged: "Closed without approval",
   pending_pr: "Recovering proposal", validation_required: "Validation required",
-  operator_setup_required: "Operator setup required", not_verified: "Not yet verified"
+  operator_setup_required: "Preparation required", not_verified: "Not yet verified",
+  verified: "Verified", pending_setup: "Preparation pending"
 };
 async function progress(id) {
   const result = await api(`/api/v1/registrations/${encodeURIComponent(id)}`);
   state.activeId = result.registration_id;
+  state.progressApp = result.app_id;
+  $("progress-prepare").hidden = !result.setup_available;
+  $("progress-deploy").disabled = !result.deployment_available;
   show("progress");
   $("progress-title").textContent = result.display_name;
   $("registration-id").textContent = result.registration_id;
@@ -571,3 +578,6 @@ $("delivery-pipeline").addEventListener("click", () => action(async () => {
   const result = await api(`/api/v1/deployment-requests/${encodeURIComponent(state.activeDeliveryId)}`);
   await pipelineView(result.app_id, result.request_id);
 }));
+
+$("progress-prepare").addEventListener("click", () => action(() => setupView(state.progressApp)));
+$("progress-deploy").addEventListener("click", () => action(() => setupDeploy(state.progressApp)));

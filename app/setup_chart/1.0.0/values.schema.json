@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appId",
+    "environment",
+    "replicaCount",
+    "image",
+    "sourceCommit",
+    "containerPort",
+    "healthPath",
+    "resources"
+  ],
+  "properties": {
+    "appId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 40,
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+    },
+    "environment": {
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ]
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "digest",
+        "pullPolicy"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^ghcr\\.io/[a-z0-9_.-]+/[a-z0-9_.-]+$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "const": "Never"
+        }
+      }
+    },
+    "sourceCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "containerPort": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "healthPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^/[A-Za-z0-9/._-]*$",
+      "allOf": [
+        {
+          "not": {
+            "pattern": "(^|/)\\.{1,2}(/|$)"
+          }
+        },
+        {
+          "not": {
+            "pattern": "//"
+          }
+        }
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "const": "100m"
+            },
+            "memory": {
+              "const": "128Mi"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "const": "500m"
+            },
+            "memory": {
+              "const": "256Mi"
+            }
+          }
+        }
+      }
+    }
+  }
+}

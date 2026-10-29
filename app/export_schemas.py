@@ -12,6 +12,8 @@ from app.contracts import (
     RegistrationFields,
     RegistrationSubmission,
 )
+from app.setup import SetupConfirmation
+from app.setup_contracts import SetupIntent, SetupPlan, SetupPolicy
 from app.uploads import Destination, UploadConfirmation
 
 
@@ -27,6 +29,10 @@ def export(directory: Path):
         (DeploymentSubmission, "deployment-submission.v1.json"),
         (Destination, "upload-destination.v1.json"),
         (UploadConfirmation, "upload-confirmation.v1.json"),
+        (SetupPolicy, "dev-setup-policy.v1.json"),
+        (SetupPlan, "dev-setup-plan.v1.json"),
+        (SetupIntent, "dev-setup-intent.v1.json"),
+        (SetupConfirmation, "dev-setup-confirmation.v1.json"),
     ]:
         schema = model.model_json_schema()
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"

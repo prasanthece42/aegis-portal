@@ -14,3 +14,5 @@
 .pipeline-running { color: #1956a0; background: #eaf2ff; }
 
 #upload pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:480px;overflow:auto;font-size:12px}#upload li,#upload-state,#upload-exclusions,#upload-repository{overflow-wrap:anywhere}#upload .card{margin-bottom:20px}#upload details{margin:16px 0}#upload input[type=file]{max-width:100%}#upload button{margin-top:10px}
+
+#dev-setup pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:480px;overflow:auto;font-size:12px}#dev-setup details{margin:14px 0}#dev-setup summary,#dev-setup li,#setup-state{overflow-wrap:anywhere}#dev-setup .card{margin:20px 0}#dev-setup .form-actions{flex-wrap:wrap;gap:10px}#setup-stages li{margin:12px 0}

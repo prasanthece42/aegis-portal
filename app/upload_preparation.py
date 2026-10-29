@@ -25,8 +25,8 @@ def preparation(config, record, fields):
     if not record["detection"]["tests_present"]:
         missing.append("Add tests covering the application and health endpoint.")
     missing.append(
-        "Run platform CI, resolve lint/test/image checks, and complete catalog "
-        "and DEV target review before selecting a release."
+        "The platform runs CI after setup approval. Lint, tests and image checks "
+        "must pass before selecting a release."
     )
     proposed = []
     for kind in ("ci", "release"):
@@ -52,13 +52,13 @@ def preparation(config, record, fields):
     return {
         "proposed_files": proposed,
         "missing_requirements": missing,
-        "installation_method": "manual_reviewed_commit",
+        "installation_method": "guided_dev_setup",
         "instructions": (
-            "Review and download these files. An authorized repository maintainer must commit "
-            "them through GitHub or their own workflow-authorized Git client. Portal credentials "
-            "cannot install workflows. Existing workflows from the ZIP were excluded. "
-            "Installing release.yml enables release builds; DEV deployment still requires "
-            "a separate confirmed request."
+            "After catalog approval, select Prepare for DEV. Review and confirm the setup; "
+            "the platform proposes and installs the approved pipeline files and prepares "
+            "DEV permissions through its authorized preparation service. "
+            "CI then builds a validated release. Deployment still requires a separate "
+            "release selection and confirmation."
         ),
         "settings": fields.model_dump(),
     }

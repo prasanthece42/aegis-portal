@@ -20,10 +20,11 @@ from app.delivery_github import DeliveryGitHub
 from app.errors import PortalError
 from app.owner_github import OwnerGitHub
 from app.security import Session, b64, canonical, strict_json
+from app.setup_github import SetupGitHub
 from app.upload_github import UploadGitHub
 
 
-class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub):
+class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub, SetupGitHub):
     def __init__(self, config: LiveConfig, client: httpx.Client | None = None):
         self.config = config
         self.client = client or httpx.Client(timeout=15, follow_redirects=False)
@@ -321,7 +322,13 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub):
         if response.status_code == 404:
             return None
         sha = response.json()["object"]["sha"]
-        data = self.file(self.config.platform_repository, "record.json", sha, token)
+        data = self.file(
+            self.config.platform_repository,
+            "record.json",
+            sha,
+            token,
+            max_size=65536 if registration_id.startswith("setup-") else 32768,
+        )
         if data is None:
             raise PortalError(503, "JOURNAL_INVALID", "Request journal is incomplete.")
         return sha, strict_json(data)
@@ -376,9 +383,15 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub):
     def journal_branch(operation_id: str) -> str:
         import re
 
-        if not re.fullmatch(r"(?:reg|req)-[0-9a-f]{64}", operation_id):
+        if not re.fullmatch(r"(?:reg|req|setup)-[0-9a-f]{64}", operation_id):
             raise ValueError("Invalid journal identity")
-        prefix = "portal-requests/" if operation_id.startswith("req-") else "portal-registrations/"
+        prefix = (
+            "portal-setups/"
+            if operation_id.startswith("setup-")
+            else "portal-requests/"
+            if operation_id.startswith("req-")
+            else "portal-registrations/"
+        )
         return prefix + operation_id
 
     def registration_pr(self, registration_id: str, entry: dict) -> dict:

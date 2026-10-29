@@ -1,0 +1,149 @@
+{
+  "$defs": {
+    "SetupPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "maxLength": 40,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "App Id",
+          "type": "string"
+        },
+        "source_repository_id": {
+          "maxLength": 24,
+          "pattern": "^[1-9][0-9]*$",
+          "title": "Source Repository Id",
+          "type": "string"
+        },
+        "source_repository": {
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_branch": {
+          "title": "Source Branch",
+          "type": "string"
+        },
+        "source_commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Commit",
+          "type": "string"
+        },
+        "catalog_entry_hash": {
+          "title": "Catalog Entry Hash",
+          "type": "string"
+        },
+        "delivery_policy_hash": {
+          "title": "Delivery Policy Hash",
+          "type": "string"
+        },
+        "setup_policy_hash": {
+          "title": "Setup Policy Hash",
+          "type": "string"
+        },
+        "cluster_id": {
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "cluster_uid": {
+          "title": "Cluster Uid",
+          "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "type": "string"
+        },
+        "workflow_files": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Workflow Files",
+          "type": "object"
+        },
+        "target_files": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Target Files",
+          "type": "object"
+        }
+      },
+      "required": [
+        "app_id",
+        "source_repository_id",
+        "source_repository",
+        "source_branch",
+        "source_commit",
+        "catalog_entry_hash",
+        "delivery_policy_hash",
+        "setup_policy_hash",
+        "cluster_id",
+        "cluster_uid",
+        "namespace",
+        "workflow_files",
+        "target_files"
+      ],
+      "title": "SetupPlan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "kind": {
+      "const": "dev_setup_request",
+      "default": "dev_setup_request",
+      "title": "Kind",
+      "type": "string"
+    },
+    "setup_id": {
+      "pattern": "^setup-[0-9a-f]{64}$",
+      "title": "Setup Id",
+      "type": "string"
+    },
+    "issuer_id": {
+      "title": "Issuer Id",
+      "type": "string"
+    },
+    "platform_repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Platform Repository Id",
+      "type": "string"
+    },
+    "requester_user_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Requester User Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "idempotency_hash": {
+      "title": "Idempotency Hash",
+      "type": "string"
+    },
+    "plan": {
+      "$ref": "#/$defs/SetupPlan"
+    }
+  },
+  "required": [
+    "setup_id",
+    "issuer_id",
+    "platform_repository_id",
+    "requester_user_id",
+    "created_at",
+    "idempotency_hash",
+    "plan"
+  ],
+  "title": "SetupIntent",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "enabled": {
+      "const": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "platform_repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Platform Repository Id",
+      "type": "string"
+    },
+    "gitops_repository_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Gitops Repository Id",
+      "type": "string"
+    },
+    "portal_app_id": {
+      "maxLength": 24,
+      "pattern": "^[1-9][0-9]*$",
+      "title": "Portal App Id",
+      "type": "string"
+    },
+    "cluster_id": {
+      "title": "Cluster Id",
+      "type": "string"
+    },
+    "cluster_uid": {
+      "title": "Cluster Uid",
+      "type": "string"
+    },
+    "source_owner": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$",
+      "title": "Source Owner",
+      "type": "string"
+    },
+    "operator_user_ids": {
+      "items": {
+        "maxLength": 24,
+        "pattern": "^[1-9][0-9]*$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Operator User Ids",
+      "type": "array"
+    },
+    "environment": {
+      "const": "dev",
+      "default": "dev",
+      "title": "Environment",
+      "type": "string"
+    },
+    "installation_method": {
+      "const": "enrolled_operator",
+      "default": "enrolled_operator",
+      "title": "Installation Method",
+      "type": "string"
+    }
+  },
+  "required": [
+    "enabled",
+    "platform_repository_id",
+    "gitops_repository_id",
+    "portal_app_id",
+    "cluster_id",
+    "cluster_uid",
+    "source_owner",
+    "operator_user_ids"
+  ],
+  "title": "SetupPolicy",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

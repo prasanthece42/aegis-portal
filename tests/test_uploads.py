@@ -119,7 +119,7 @@ def test_upload_to_registration_and_restart_recovery(portal, settings, fields):
     preparation = client.post(f"/api/v1/uploads/{uid}/preparation", json=fields)
     assert preparation.status_code == 200, preparation.text
     proposal = preparation.json()
-    assert proposal["installation_method"] == "manual_reviewed_commit"
+    assert proposal["installation_method"] == "guided_dev_setup"
     assert len(proposal["proposed_files"]) == 2
     assert all("@" + "a" * 40 in f["content"] for f in proposal["proposed_files"])
     assert "requirements-prod.txt" in " ".join(proposal["missing_requirements"])

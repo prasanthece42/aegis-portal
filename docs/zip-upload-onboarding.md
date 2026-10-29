@@ -56,12 +56,11 @@ The loopback HTTPS gateway allows up to 5 MiB only on the binary ZIP upload rout
 requests retain the 32 KiB JSON limit. Deploying new portal source does not update that host
 process; the operator must restart the gateway from the reviewed new source after rollout.
 
-Workflow installation deliberately uses **manual reviewed commit**: the portal displays and
-downloads proposals pinned to the configured platform workflow commit. A maintainer commits
-them via GitHub or their own workflow-authorized Git client. The portal never writes workflow
-files and keeps its current workflow-write restriction. Installing release workflows can
-start CI; deployment still requires catalog approval, target setup, a validated immutable
-release and the existing separate signed DEV deployment request.
+After catalog approval, workflow installation and DEV target preparation use the guided
+**Prepare for DEV** flow. The portal queues a signed request; an enrolled, workflow-authorized
+operator service handles the exact reviewed files and target permissions. Application and
+platform-owner approvals remain visible in the portal. The portal's App credentials retain
+no workflow-write permission. See [guided preparation](guided-dev-setup.md).
 
 ## Inspection and recovery
 

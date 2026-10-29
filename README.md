@@ -237,3 +237,10 @@ demo, saves results under `.local/monitoring-qa/`, and never authenticates to li
 
 Public Python web app ZIP uploads join the existing registration flow.
 See [live configuration and recovery](docs/zip-upload-onboarding.md).
+
+## Guided DEV preparation
+
+After catalog approval, choose **Prepare for DEV** to review and authorize automatic pipeline
+and target preparation. The enrolled operator service carries out reviewed setup and CI; the
+portal shows approvals and real readiness. Selecting and confirming a DEV release remains
+separate. See [authority, operator service and recovery](docs/guided-dev-setup.md).

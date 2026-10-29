@@ -26,6 +26,7 @@ from app.github import GitHub
 from app.monitoring import MonitoringService
 from app.registration import RegistrationService
 from app.security import Session, Sessions, Signer, strict_json
+from app.setup import SetupConfirmation, SetupService
 from app.telemetry import Telemetry, TelemetryMiddleware
 from app.uploads import MAX_ZIP, Destination, UploadConfirmation, UploadService
 from app.workflows import WorkflowService, WorkflowSubmission
@@ -134,6 +135,7 @@ def create_app(
     delivery = DeploymentService(config, backend, signer) if config else None
     workflows = WorkflowService(backend, signer) if config else None
     monitoring = MonitoringService(backend) if config else None
+    setup = SetupService(backend, signer) if config else None
 
     uploads = (
         UploadService(
@@ -163,7 +165,7 @@ def create_app(
         if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 monitoring.policy()
-                _app.state.telemetry = Telemetry("aegis-portal", "0.5.1")
+                _app.state.telemetry = Telemetry("aegis-portal", "0.6.0")
                 backend.telemetry = _app.state.telemetry
             except PortalError:
                 pass  # The front door must remain available to repair monitoring.
@@ -177,11 +179,12 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.5.1", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.6.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
     app.state.uploads = uploads
+    app.state.setup = setup
     app.state.monitoring, app.state.telemetry = monitoring, None
     app.add_middleware(RequestBoundary)
     app.add_middleware(TelemetryMiddleware, holder=app)
@@ -320,7 +323,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.5.1",
+            "version": "0.6.0",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
@@ -450,6 +453,28 @@ def create_app(
     ):
         return workflows.submit(session, repository, number, fields)
 
+    @app.get("/api/v1/applications/{app_id}/dev-setup")
+    def setup_latest(app_id: AppId, session: Auth):
+        return setup.latest(session, app_id)
+
+    @app.post("/api/v1/applications/{app_id}/dev-setup-validations")
+    def setup_preview(app_id: AppId, session: Auth):
+        return setup.preview(session, app_id)
+
+    @app.post("/api/v1/applications/{app_id}/dev-setups")
+    def setup_submit(app_id: AppId, request: Request, fields: SetupConfirmation, session: Auth):
+        return setup.submit(
+            session, app_id, fields.review_token, request.headers.get("idempotency-key", "")
+        )
+
+    @app.get("/api/v1/applications/{app_id}/dev-setups/{setup_id}")
+    def setup_status(app_id: AppId, setup_id: str, session: Auth):
+        return setup.get(session, app_id, setup_id)
+
+    @app.post("/api/v1/applications/{app_id}/dev-setups/{setup_id}/approvals")
+    def setup_approve(app_id: AppId, setup_id: str, fields: SetupConfirmation, session: Auth):
+        return setup.approve(session, app_id, setup_id, fields.review_token)
+
     @app.get("/api/v1/upload-capabilities")
     def upload_capabilities(session: Auth):
         return uploads.capabilities(session)
@@ -566,7 +591,25 @@ def create_app(
     def get_registration(registration_id: str, session: Auth):
         if not re.fullmatch(r"reg-[0-9a-f]{64}", registration_id):
             raise PortalError(404, "REGISTRATION_NOT_FOUND", "Registration is unavailable.")
-        return service.get(session, registration_id)
+        result = service.get(session, registration_id)
+        result["setup_available"] = result["requirements"][0]["status"] == "approved"
+        if result["setup_available"]:
+            try:
+                observed = setup.latest(session, result["app_id"])
+                for item, key in zip(
+                    result["requirements"][1:],
+                    ("pipeline_ready", "target_ready", "release_ready"),
+                    strict=True,
+                ):
+                    item["status"] = "verified" if observed.get(key) else "pending_setup"
+                    if key != "release_ready":
+                        item["actor"] = "Platform automation"
+                result["setup_state"] = observed["state"]
+                result["deployment_available"] = observed["state"] == "ready"
+            except PortalError as exc:
+                result["setup_state"] = "unavailable"
+                result["setup_message"] = exc.message
+        return result
 
     @app.get("/api/v1/applications")
     def list_applications(session: Auth):

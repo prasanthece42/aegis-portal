@@ -1,0 +1,6 @@
+apiVersion: v2
+name: web-service
+description: Aegis stateless Python web application workload
+type: application
+version: 1.0.0
+kubeVersion: '>=1.30.0-0'
