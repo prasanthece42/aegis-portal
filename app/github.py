@@ -124,17 +124,24 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub, SetupGitHub):
         )
 
     def paginate(self, path: str, token: str, collection: str | None = None, **params) -> list:
+        status_path = re.fullmatch(r"/repos/([^/]+/[^/]+)/commits/([0-9a-f]{40})/statuses", path)
+        if status_path:
+            # Current evidence needs the latest row per context, not the entire
+            # append-only history produced by recurring health observations.
+            path = path.removesuffix("statuses") + "status"
+            collection = "statuses"
         items = []
         for page in range(1, 11):
             response = self.api(
                 "GET", path, token, params={**params, "per_page": 100, "page": page}
             )
             value = response.json()
+            if status_path and value.get("sha") != status_path[2]:
+                raise PortalError(
+                    503, "GITHUB_OPERATION_FAILED", "GitHub returned statuses for another commit."
+                )
             items.extend(value[collection] if collection else value)
             if 'rel="next"' not in response.headers.get("Link", ""):
-                status_path = re.fullmatch(
-                    r"/repos/([^/]+/[^/]+)/commits/([0-9a-f]{40})/statuses", path
-                )
                 if status_path:
                     from aegis_platform.delivery import normalize_statuses
 

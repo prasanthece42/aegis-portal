@@ -171,6 +171,86 @@ def test_pagination_is_complete_or_fails_visibly(github_factory):
     assert pages == [1, 2]
 
 
+def test_status_discovery_reads_current_contexts_instead_of_unbounded_history(github_factory):
+    create, _key = github_factory
+    commit = "a" * 40
+    pages = []
+
+    def handler(request):
+        assert request.url.path == f"/repos/demo/orders-api/commits/{commit}/status"
+        assert request.url.params["per_page"] == "100"
+        page = int(request.url.params["page"])
+        pages.append(page)
+        # A commit can have thousands of historical observations but only a
+        # few current contexts. Exercise pagination of those contexts as well.
+        return httpx.Response(
+            200,
+            json={
+                "sha": commit,
+                "state": "failure",
+                "statuses": [
+                    {
+                        "id": page,
+                        "context": f"aegis/context-{page}",
+                        "state": "failure" if page == 2 else "success",
+                        "url": f"https://api.github.com/repos/demo/orders-api/statuses/{commit}",
+                    }
+                ],
+            },
+            headers={"Link": '<https://api.github.com/page>; rel="next"'} if page == 1 else {},
+        )
+
+    rows = create(handler).paginate(f"/repos/demo/orders-api/commits/{commit}/statuses", "token")
+    assert pages == [1, 2]
+    assert [row["sha"] for row in rows] == [commit, commit]
+    assert [row["state"] for row in rows] == ["success", "failure"]
+
+
+def test_status_discovery_rejects_a_different_commit(github_factory):
+    create, _key = github_factory
+    github = create(lambda _: httpx.Response(200, json={"sha": "b" * 40, "statuses": []}))
+    with pytest.raises(PortalError) as error:
+        github.paginate(f"/repos/demo/orders-api/commits/{'a' * 40}/statuses", "token")
+    assert error.value.code == "GITHUB_OPERATION_FAILED"
+
+
+def test_status_discovery_preserves_repository_binding(github_factory):
+    create, _key = github_factory
+    commit = "a" * 40
+    github = create(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "sha": commit,
+                "statuses": [{"url": f"https://api.github.com/repos/other/repo/statuses/{commit}"}],
+            },
+        )
+    )
+    with pytest.raises(ValueError, match="Status URL differs"):
+        github.paginate(f"/repos/demo/orders-api/commits/{commit}/statuses", "token")
+
+
+@pytest.mark.parametrize("status_request", [False, True])
+def test_discovery_never_returns_partial_results_at_page_limit(github_factory, status_request):
+    create, _key = github_factory
+    commit = "a" * 40
+    pages = []
+
+    def handler(request):
+        pages.append(int(request.url.params["page"]))
+        return httpx.Response(
+            200,
+            json={"sha": commit, "statuses": []} if status_request else [],
+            headers={"Link": '<https://api.github.com/page>; rel="next"'},
+        )
+
+    path = f"/repos/demo/orders-api/commits/{commit}/statuses" if status_request else "/example"
+    with pytest.raises(PortalError) as error:
+        create(handler).paginate(path, "token")
+    assert error.value.code == "DISCOVERY_LIMIT"
+    assert pages == list(range(1, 11))
+
+
 def test_existing_registration_pr_cannot_hide_modified_configuration(github_factory, monkeypatch):
     create, _key = github_factory
     github = create(lambda _request: httpx.Response(500))
