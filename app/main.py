@@ -165,7 +165,7 @@ def create_app(
         if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 monitoring.policy()
-                _app.state.telemetry = Telemetry("aegis-portal", "0.6.0")
+                _app.state.telemetry = Telemetry("aegis-portal", "0.6.1")
                 backend.telemetry = _app.state.telemetry
             except PortalError:
                 pass  # The front door must remain available to repair monitoring.
@@ -179,7 +179,7 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.6.0", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.6.1", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
@@ -323,7 +323,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.6.0",
+            "version": "0.6.1",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
@@ -636,7 +636,12 @@ def create_app(
         from app.pipeline import discover
 
         delivery.enabled()
-        return discover(backend, session, app_id)
+        return discover(
+            backend,
+            session,
+            app_id,
+            delivery_lookup=lambda run: delivery.pipeline_status(session, app_id, run),
+        )
 
     @app.get("/api/v1/deployment-requests/{request_id}/pipeline")
     def deployment_pipeline(request_id: str, session: Auth):

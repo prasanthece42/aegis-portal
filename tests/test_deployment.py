@@ -188,3 +188,53 @@ def test_deployment_json_contract_forbids_browser_destinations():
         DeploymentSubmission.model_validate(
             {"app_id": "orders-api", "environment": "dev", "release_id": "700"}
         )
+
+
+@pytest.mark.parametrize("mismatch", [None, "user", "app", "sha", "run", "signature", "attempt"])
+def test_pipeline_discovers_only_signed_matching_principal_app_source_and_run(
+    delivery, monkeypatch, mismatch
+):
+    client, app, context, _ = delivery
+    response = client.post(
+        "/api/v1/deployment-requests",
+        json=confirm(client),
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert response.status_code == 202
+    service = app.state.delivery
+    rid = response.json()["request_id"]
+    record = service.backend.journal(rid)[1]
+    if mismatch:
+        from copy import deepcopy
+
+        record = deepcopy(record)
+        changes = {
+            "user": ("requester_user_id", "999"),
+            "app": ("app_id", "other-app"),
+            "sha": ("source_commit", "c" * 40),
+            "run": ("release_workflow_run_id", "999"),
+        }
+        if mismatch in changes:
+            key, value = changes[mismatch]
+            record["payload"]["intent"][key] = value
+            record = service.signer.seal(record["payload"])
+        elif mismatch == "signature":
+            record["payload"]["intent"]["release_id"] = "999"
+    monkeypatch.setattr(service.backend, "delivery_records", lambda: [(rid, record)], raising=False)
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(service.backend, "delivery_authorize", lambda *_: (None, None, None))
+    monkeypatch.setattr(
+        service.backend,
+        "admitted_release",
+        lambda *_: (SimpleNamespace(run_attempt=1), None, None),
+        raising=False,
+    )
+    session = next(iter(app.state.sessions.records.values()))
+    run = {"id": 123, "head_sha": "b" * 40, "run_attempt": 2 if mismatch == "attempt" else 1}
+    if mismatch == "signature":
+        with pytest.raises(PortalError, match="verified"):
+            service.pipeline_status(session, "orders-api", run)
+    else:
+        result = service.pipeline_status(session, "orders-api", run)
+        assert (result is not None) == (mismatch is None)

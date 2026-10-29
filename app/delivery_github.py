@@ -20,6 +20,31 @@ from app.errors import PortalError
 
 
 class DeliveryGitHub:
+    def delivery_records(self):
+        import re
+
+        refs = self.api(
+            "GET",
+            f"/repos/{self.config.platform_repository}/git/matching-refs/heads/portal-requests/",
+            self.platform_token(),
+        ).json()
+        if len(refs) > 100:
+            raise PortalError(
+                503, "REQUEST_DISCOVERY_LIMIT", "Delivery history exceeds the discovery budget."
+            )
+        records = []
+        for ref in refs:
+            rid = ref["ref"].removeprefix("refs/heads/portal-requests/")
+            if re.fullmatch(r"req-[0-9a-f]{64}", rid):
+                raw = self.file(
+                    self.config.platform_repository,
+                    "record.json",
+                    ref["object"]["sha"],
+                    self.platform_token(),
+                )
+                records.append((rid, strict_json(raw)))
+        return records
+
     def delivery_dispatch(self, rid, binding):
         repo, token = self.config.gitops_repository, self.gitops_token(write=True)
         path = ".github/workflows/delivery-request.yml"
