@@ -931,12 +931,12 @@ def guided_registration(client, app, fields, monkeypatch):
         },
     )
     monkeypatch.setattr(backend, "registration_status", lambda b: {**b, "merged": False})
-    preview = client.post("/api/v1/registration-validations", json=fields)
+    preview = client.post("/api/v1/registration-validations?guided_setup=true", json=fields)
     assert preview.status_code == 200, preview.text
     assert preview.json()["automatic_setup"]["blockers"] == []
     result = client.post(
         "/api/v1/registrations",
-        json={**fields, "review_token": preview.json()["review_token"]},
+        json={**fields, "prepare_dev": True, "review_token": preview.json()["review_token"]},
         headers={"Idempotency-Key": str(uuid4())},
     )
     assert result.status_code == 201, result.text
@@ -997,14 +997,14 @@ def test_setup_change_between_registration_preview_and_confirm_requires_new_revi
     backend = app.state.service.backend
     app.state.service.config = backend.config
     monkeypatch.setattr(backend, "catalog", lambda: [])
-    preview = client.post("/api/v1/registration-validations", json=fields)
+    preview = client.post("/api/v1/registration-validations?guided_setup=true", json=fields)
     assert preview.status_code == 200
     transport.files[("demo/aegis-platform", "policies/portal-setup.json")] = canonical(
         {**transport.case.policy.model_dump(), "operator_user_ids": ["1", "2"]}
     )
     result = client.post(
         "/api/v1/registrations",
-        json={**fields, "review_token": preview.json()["review_token"]},
+        json={**fields, "prepare_dev": True, "review_token": preview.json()["review_token"]},
         headers={"Idempotency-Key": str(uuid4())},
     )
     assert result.status_code in {409, 503}
@@ -1022,6 +1022,7 @@ def registration_payload(case, intent):
         "source_commit": intent.plan.source_commit,
         "catalog_entry": case.entry.model_dump(),
         "policy_hash": digest(case.config.model_dump()),
+        "prepare_dev": True,
         "setup_intent": intent.model_dump(),
         "binding": {"number": 1},
     }
@@ -1097,3 +1098,105 @@ def test_worker_merges_only_exact_reviewed_catalog_after_current_grants(
         )
     assert bool(platform.pr.get("merged_at")) == (attack is None)
     assert operator.target.pr is None and not operator.applied
+
+
+def registration_adapter(app, monkeypatch):
+    backend = app.state.service.backend
+    app.state.service.config = backend.config
+    monkeypatch.setattr(backend, "catalog", lambda: [])
+    monkeypatch.setattr(
+        backend,
+        "registration_pr",
+        lambda *_: {
+            "number": 7,
+            "url": "https://github.com/demo/aegis-platform/pull/7",
+            "state": "open",
+        },
+    )
+    monkeypatch.setattr(backend, "registration_status", lambda b: {**b, "merged": False})
+    return backend
+
+
+def test_legacy_browser_registration_never_authorizes_automatic_preparation(
+    setup_portal, fields, monkeypatch
+):
+    client, app, _ = setup_portal
+    backend = registration_adapter(app, monkeypatch)
+    monkeypatch.setattr(
+        backend,
+        "registration_setup_plan",
+        lambda *_: pytest.fail("Legacy client must not request a setup plan"),
+    )
+    preview = client.post("/api/v1/registration-validations", json=fields)
+    assert preview.status_code == 200 and preview.json()["automatic_setup"] is None
+    response = client.post(
+        "/api/v1/registrations",
+        json={**fields, "review_token": preview.json()["review_token"]},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["automatic_setup"] is False
+    payload = backend.journal(response.json()["registration_id"])[1]["payload"]
+    assert "setup_intent" not in payload and "prepare_dev" not in payload
+
+
+@pytest.mark.parametrize("preview_guided,submitted", [(True, False), (False, True), (True, "true")])
+def test_guided_consent_requires_explicit_boolean_and_matching_review_scope(
+    setup_portal, fields, monkeypatch, preview_guided, submitted
+):
+    client, app, transport = setup_portal
+    registration_adapter(app, monkeypatch)
+    preview = client.post(
+        "/api/v1/registration-validations" + ("?guided_setup=true" if preview_guided else ""),
+        json=fields,
+    )
+    assert preview.status_code == 200
+    response = client.post(
+        "/api/v1/registrations",
+        json={**fields, "prepare_dev": submitted, "review_token": preview.json()["review_token"]},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert response.status_code == (422 if isinstance(submitted, str) else 409), response.text
+    assert not transport.refs
+
+
+def test_combined_registration_recovery_cannot_change_its_authorization_scope(
+    setup_portal, fields, monkeypatch
+):
+    client, app, _ = setup_portal
+    backend = registration_adapter(app, monkeypatch)
+    preview = client.post("/api/v1/registration-validations?guided_setup=true", json=fields).json()
+    key = str(uuid4())
+    body = {**fields, "prepare_dev": True, "review_token": preview["review_token"]}
+    first = client.post("/api/v1/registrations", json=body, headers={"Idempotency-Key": key})
+    assert first.status_code == 201
+    recovered = client.post(
+        "/api/v1/registrations",
+        json={**body, "review_token": "recover-existing-reservation-only"},
+        headers={"Idempotency-Key": key},
+    )
+    assert (
+        recovered.status_code == 201
+        and recovered.json()["registration_id"] == first.json()["registration_id"]
+    )
+    wrong = client.post(
+        "/api/v1/registrations",
+        json={**body, "prepare_dev": False},
+        headers={"Idempotency-Key": key},
+    )
+    assert wrong.status_code == 409
+    raw = backend.journal(first.json()["registration_id"])[1]
+    payload = deepcopy(raw["payload"])
+    payload.pop("prepare_dev")
+    old = app.state.service.signer.seal(payload)
+    from app.setup_contracts import setup_payload
+
+    with pytest.raises(ValueError):
+        setup_payload(old["payload"])
+    backend.save_journal(
+        first.json()["registration_id"], old, backend.journal(first.json()["registration_id"])[0]
+    )
+    assert not backend.setup_records()
+    assert (
+        backend.registration_setup_journal("setup-" + first.json()["registration_id"][4:]) is None
+    )

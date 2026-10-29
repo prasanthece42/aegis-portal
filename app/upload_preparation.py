@@ -54,7 +54,7 @@ def preparation(config, record, fields):
         "missing_requirements": missing,
         "installation_method": "guided_dev_setup",
         "instructions": (
-            "After catalog approval, select Prepare for DEV. Review and confirm the setup; "
+            "Continue to the combined registration and setup review. After catalog approval, "
             "the platform proposes and installs the approved pipeline files and prepares "
             "DEV permissions through its authorized preparation service. "
             "CI then builds a validated release. Deployment still requires a separate "

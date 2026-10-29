@@ -5,7 +5,12 @@ registration together with the exact proposed pipeline and DEV target files. Sub
 The application journey follows ownership review, preparation, build, release review and
 measured DEV health without requiring a developer to coordinate separate screens.
 
-The initial review authorizes **proposals**, never their approval or deployment. Its signed
+The initial review authorizes **proposals**, never their approval or deployment.
+Guided clients explicitly request `guided_setup=true` during preview and send the strict
+boolean `prepare_dev: true` on submission. Both the review token and signed journal bind
+that scope. Registration-only is the default for older clients. Records without the explicit
+marker never authorize automatic preparation, including historical 0.7.0 combined records;
+they retain the existing explicit setup path. Recovery cannot change a confirmed scope. Its signed
 registration journal contains an explicit setup intent bound to the original principal,
 source commit, catalog entry, workflow/chart files, policy, cluster and operation identity.
 The enrolled worker independently verifies that signature and the current public policy,

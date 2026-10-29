@@ -144,7 +144,7 @@ def setup_payload(payload):
     if payload.get("kind") == "dev_setup_request":
         return payload
     nested = payload.get("setup_intent")
-    if not nested:
+    if not nested or payload.get("prepare_dev") is not True:
         raise ValueError("Not an explicit DEV setup request")
     intent = SetupIntent.model_validate(nested)
     rid = payload.get("registration_id", "")

@@ -92,21 +92,35 @@ class RegistrationService:
                     "Application ID or repository has an existing registration reservation.",
                 )
 
-    def preview(self, session: Session, fields: RegistrationFields) -> dict:
+    @staticmethod
+    def intent_hash(fields, prepare_dev=False):
+        return digest(
+            {**fields.model_dump(), "prepare_dev": True} if prepare_dev else fields.model_dump()
+        )
+
+    def preview(self, session: Session, fields: RegistrationFields, *, prepare_dev=False) -> dict:
         with self.lock:
             source = self.authorize(session, fields)
             self.unique(fields)
             detection = self.backend.detection(source)
-            setup_plan, setup_review = self.setup_review(fields, source)
+            setup_plan, setup_review = (
+                self.setup_review(fields, source) if prepare_dev else (None, None)
+            )
+            if setup_plan is None:
+                prepare_dev = False
             payload = fields.model_dump()
             token = self.signer.review_token(
                 {
                     "kind": "registration_review",
                     "principal_id": session.user_id,
-                    "payload_hash": digest(payload),
+                    "payload_hash": self.intent_hash(fields, prepare_dev),
                     "source_commit": source["source_commit"],
                     "policy_hash": self.policy_hash(),
-                    **({"setup_plan_hash": digest(setup_plan.model_dump())} if setup_plan else {}),
+                    **(
+                        {"prepare_dev": True, "setup_plan_hash": digest(setup_plan.model_dump())}
+                        if setup_plan
+                        else {}
+                    ),
                 }
             )
             return {
@@ -170,16 +184,21 @@ class RegistrationService:
             ) from exc
 
     def submit(self, session: Session, submission: RegistrationSubmission, key: str) -> dict:
-        fields = RegistrationFields.model_validate(submission.model_dump(exclude={"review_token"}))
+        fields = RegistrationFields.model_validate(
+            submission.model_dump(exclude={"review_token", "prepare_dev"})
+        )
+        prepare_dev = submission.prepare_dev
+        intent_hash = self.intent_hash(fields, prepare_dev)
         rid = operation_id(self.config.issuer_id, session.user_id, "registration", key)
         with self.lock:
             source = self.authorize(session, fields)
             existing = self.backend.journal(rid)
             if existing:
                 payload = self.verified(existing[1], rid)
-                if payload["requester_user_id"] != session.user_id or payload[
-                    "payload_hash"
-                ] != digest(fields.model_dump()):
+                if (
+                    payload["requester_user_id"] != session.user_id
+                    or payload["payload_hash"] != intent_hash
+                ):
                     raise PortalError(
                         409,
                         "IDEMPOTENCY_CONFLICT",
@@ -189,7 +208,13 @@ class RegistrationService:
                     return self.result(payload)
             else:
                 self.unique(fields)
-                setup_plan, setup_review = self.setup_review(fields, source)
+                setup_plan, setup_review = (
+                    self.setup_review(fields, source) if prepare_dev else (None, None)
+                )
+                if prepare_dev and setup_plan is None:
+                    raise PortalError(
+                        503, "SETUP_UNAVAILABLE", "Guided preparation is unavailable."
+                    )
                 if setup_review and setup_review["blockers"]:
                     raise PortalError(
                         409, "SETUP_BLOCKED", "Resolve the setup requirements before submitting."
@@ -205,10 +230,14 @@ class RegistrationService:
                 expected = {
                     "kind": "registration_review",
                     "principal_id": session.user_id,
-                    "payload_hash": digest(fields.model_dump()),
+                    "payload_hash": intent_hash,
                     "source_commit": source["source_commit"],
                     "policy_hash": self.policy_hash(),
-                    **({"setup_plan_hash": digest(setup_plan.model_dump())} if setup_plan else {}),
+                    **(
+                        {"prepare_dev": True, "setup_plan_hash": digest(setup_plan.model_dump())}
+                        if setup_plan
+                        else {}
+                    ),
                 }
                 if {k: review.get(k) for k in expected} != expected:
                     raise PortalError(
@@ -224,7 +253,7 @@ class RegistrationService:
                     "requester_user_id": session.user_id,
                     "created_at": datetime.now(UTC).isoformat(),
                     "idempotency_key_hash": digest(key),
-                    "payload_hash": digest(fields.model_dump()),
+                    "payload_hash": intent_hash,
                     "policy_hash": self.policy_hash(),
                     "source_commit": source["source_commit"],
                     "fields": fields.model_dump(),
@@ -232,6 +261,7 @@ class RegistrationService:
                     "binding": None,
                 }
                 if setup_plan:
+                    payload["prepare_dev"] = True
                     payload["setup_intent"] = SetupIntent(
                         setup_id="setup-" + rid[4:],
                         issuer_id=self.config.issuer_id,
@@ -248,7 +278,7 @@ class RegistrationService:
                             503, "RESERVATION_PENDING", "Retry the same registration key.", True
                         )
                     payload = self.verified(existing[1], rid)
-                    if payload["payload_hash"] != digest(fields.model_dump()):
+                    if payload["payload_hash"] != intent_hash:
                         raise PortalError(
                             409, "IDEMPOTENCY_CONFLICT", "Conflicting registration key."
                         )
@@ -314,7 +344,8 @@ class RegistrationService:
                 {"name": "Validated release", "status": "not_verified", "actor": "Application CI"},
             ],
             "deployment_available": False,
-            "automatic_setup": bool(payload.get("setup_intent")),
+            "automatic_setup": payload.get("prepare_dev") is True
+            and bool(payload.get("setup_intent")),
         }
 
     def get(self, session: Session, rid: str) -> dict:

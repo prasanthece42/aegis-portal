@@ -55,11 +55,22 @@ class SetupGitHub:
 
     def registration_setup_journal(self, setup_id):
         raw = self.journal("reg-" + setup_id[6:])
-        return raw if raw and raw[1].get("payload", {}).get("setup_intent") else None
+        return (
+            raw
+            if raw
+            and (
+                raw[1].get("payload", {}).get("prepare_dev") is True
+                and raw[1].get("payload", {}).get("setup_intent")
+            )
+            else None
+        )
 
     def registration_preparation_status(self, registration_id):
         raw = self.journal(registration_id)
-        if not raw or not raw[1].get("payload", {}).get("setup_intent"):
+        if not raw or not (
+            raw[1].get("payload", {}).get("prepare_dev") is True
+            and raw[1].get("payload", {}).get("setup_intent")
+        ):
             return "unknown"
         revision, delivery = self.catalog_snapshot()
         return self.setup_job_evidence(raw[0], self.setup_policy(revision, delivery))
@@ -355,7 +366,10 @@ class SetupGitHub:
             result.append((rid, strict_json(raw)))
         for rid in self.journal_ids():
             raw = self.journal(rid)
-            if raw and raw[1].get("payload", {}).get("setup_intent"):
+            if raw and (
+                raw[1].get("payload", {}).get("prepare_dev") is True
+                and raw[1].get("payload", {}).get("setup_intent")
+            ):
                 result.append(("setup-" + rid[4:], raw[1]))
         if len(result) > 100:
             raise PortalError(
