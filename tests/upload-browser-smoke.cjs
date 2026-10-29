@@ -51,7 +51,7 @@ const output = path.resolve(process.env.AEGIS_QA_OUTPUT || '.local/upload-qa');
     await page.locator('#upload-settings button[type=submit]').click();
     await page.locator('#upload-continue').waitFor({ state: 'visible' });
     assert.match(await page.locator('#upload-proposals').textContent(), /requirements are hash-locked/);
-    assert.match(await page.locator('#upload-proposals').textContent(), /select Prepare for DEV/);
+    assert.match(await page.locator('#upload-proposals').textContent(), /combined registration and setup review/);
     await page.locator('#upload-proposals summary').first().click();
     await page.screenshot({ path: path.join(output, 'upload-preparation-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 375, height: 812 });

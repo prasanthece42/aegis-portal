@@ -119,7 +119,9 @@ class SetupWorker:
                         self.worker.platform.file("record.json", ref["object"]["sha"])
                     )
                     if registration:
-                        if not record.get("payload", {}).get("setup_intent"):
+                        if record.get("payload", {}).get(
+                            "prepare_dev"
+                        ) is not True or not record.get("payload", {}).get("setup_intent"):
                             continue
                         if record["payload"].get("registration_id") != original_id:
                             raise ValueError("Registration journal identity changed")

@@ -25,9 +25,10 @@ const targetFiles = [{ path: 'clusters/dev/namespace.json', content: '{"kind":"N
   try {
     await page.route('**/api/v1/status', route => route.fulfill({ json: { mode: 'demo', version: '0.7.0', registration_enabled: true, deployment_enabled: true } }));
     await page.route('**/api/v1/applications', route => route.fulfill({ json: { items: [app] } }));
-    await page.route('**/api/v1/registrations', route => route.request().method() === 'POST' ? (registrations++, route.fulfill({ json: registration() })) : route.fulfill({ json: { items: [] } }));
+    await page.route('**/api/v1/registrations', route => route.request().method() === 'POST' ? (registrations++, assert.equal(route.request().postDataJSON().prepare_dev, true), route.fulfill({ json: registration() })) : route.fulfill({ json: { items: [] } }));
     await page.route('**/api/v1/registrations/*', route => route.fulfill({ json: registration() }));
-    await page.route('**/api/v1/registration-validations', async route => {
+    await page.route('**/api/v1/registration-validations*', async route => {
+      assert.equal(new URL(route.request().url()).searchParams.get("guided_setup"), "true");
       const fields = route.request().postDataJSON();
       await route.fulfill({ json: { fields, source: { full_name: 'demo/orders-api', source_commit: 'a'.repeat(40) }, detection: { dockerfile_present: true }, review_token: 'synthetic-registration-review', automatic_setup: { workflow_files: files, target_files: targetFiles, blockers: [], notice: 'Review these exact proposals. Submitting authorizes preparation after catalog approval; deployment remains separate.' } } });
     });

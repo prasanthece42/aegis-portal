@@ -258,7 +258,7 @@ $("last-delivery").addEventListener("click", () => action(async () => {
 $("recover-delivery").addEventListener("click", () => action(async () => {
   const pending = JSON.parse(sessionStorage.getItem("aegis.pending-delivery") || "null");
   if (!pending || pending.user_id !== state.session.user_id) throw new Error("No interrupted request belongs to this identity.");
-  const result = await api("/api/v1/deployment-requests", { method: "POST", headers: { "Idempotency-Key": pending.key }, body: JSON.stringify({ ...pending.fields, review_token: "recover-existing-reservation-only" }) });
+  const result = await api("/api/v1/deployment-requests", { method: "POST", headers: { "Idempotency-Key": pending.key }, body: JSON.stringify({ ...pending.fields, prepare_dev: Boolean(pending.prepare_dev), review_token: "recover-existing-reservation-only" }) });
   sessionStorage.removeItem("aegis.pending-delivery");
   sessionStorage.setItem("aegis.last-delivery", JSON.stringify({ user_id: state.session.user_id, request_id: result.request_id }));
   await deliveryProgress(result.request_id);
@@ -292,7 +292,7 @@ function detail(label, value) {
   $("review-details").append(node("dt", label), node("dd", value));
 }
 async function validate() {
-  state.preview = await api("/api/v1/registration-validations", { method: "POST", body: JSON.stringify(fields()) });
+  state.preview = await api("/api/v1/registration-validations?guided_setup=true", { method: "POST", body: JSON.stringify(fields()) });
   const preview = state.preview;
   $("review-details").replaceChildren();
   $("review-title").textContent = `Review ${preview.fields.display_name}`;
@@ -338,11 +338,12 @@ async function submit() {
   let pending;
   try { pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration")); } catch { pending = null; }
   if (!pending || pending.user_id !== state.session.user_id || JSON.stringify(pending.fields) !== JSON.stringify(state.preview.fields)) {
-    pending = { key: crypto.randomUUID(), fields: state.preview.fields, user_id: state.session.user_id };
+    pending = { key: crypto.randomUUID(), fields: state.preview.fields, user_id: state.session.user_id, prepare_dev: Boolean(state.preview.automatic_setup) };
     sessionStorage.setItem("aegis.pending-registration", JSON.stringify(pending));
   }
+  if (Boolean(pending.prepare_dev) !== Boolean(state.preview.automatic_setup)) throw new Error("Recover the earlier registration before changing its setup authorization.");
   const result = await api("/api/v1/registrations", { method: "POST", headers: { "Idempotency-Key": pending.key },
-    body: JSON.stringify({ ...pending.fields, review_token: state.preview.review_token }) });
+    body: JSON.stringify({ ...pending.fields, prepare_dev: Boolean(pending.prepare_dev), review_token: state.preview.review_token }) });
   sessionStorage.removeItem("aegis.pending-registration");
   sessionStorage.setItem("aegis.last-registration", result.registration_id);
   await onboardingView(result.app_id, result.registration_id);
@@ -351,7 +352,7 @@ async function recoverPending() {
   const pending = JSON.parse(sessionStorage.getItem("aegis.pending-registration") || "null");
   if (!pending || pending.user_id !== state.session.user_id) throw new Error("No interrupted submission belongs to this identity.");
   const result = await api("/api/v1/registrations", { method: "POST", headers: { "Idempotency-Key": pending.key },
-    body: JSON.stringify({ ...pending.fields, review_token: "recover-existing-reservation-only" }) });
+    body: JSON.stringify({ ...pending.fields, prepare_dev: Boolean(pending.prepare_dev), review_token: "recover-existing-reservation-only" }) });
   sessionStorage.removeItem("aegis.pending-registration");
   await onboardingView(result.app_id, result.registration_id);
 }

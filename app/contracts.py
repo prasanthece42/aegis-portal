@@ -1,4 +1,4 @@
-"""Compatibility imports: contracts are owned by the versioned platform package."""
+"""Platform contracts plus explicit portal-specific preparation consent."""
 
 from aegis_platform.contracts import (
     Access,
@@ -13,12 +13,20 @@ from aegis_platform.contracts import (
     Identifier,
     PriorEvidence,
     RegistrationFields,
-    RegistrationSubmission,
     Runtime,
     Source,
     Target,
     Versions,
 )
+from aegis_platform.contracts import (
+    RegistrationSubmission as BaseRegistrationSubmission,
+)
+from pydantic import StrictBool
+
+
+class RegistrationSubmission(BaseRegistrationSubmission):
+    prepare_dev: StrictBool = False
+
 
 __all__ = [
     "Access",

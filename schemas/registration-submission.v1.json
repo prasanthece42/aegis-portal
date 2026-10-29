@@ -76,6 +76,11 @@
       "minLength": 20,
       "title": "Review Token",
       "type": "string"
+    },
+    "prepare_dev": {
+      "default": false,
+      "title": "Prepare Dev",
+      "type": "boolean"
     }
   },
   "required": [
