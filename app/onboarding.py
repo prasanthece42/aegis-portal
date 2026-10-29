@@ -12,6 +12,25 @@ def onboarding_status(session, app_id, registration_id, registrations, setup, de
         catalog = registration["requirements"][0]["status"]
         if catalog != "approved":
             closed = catalog == "closed_unmerged"
+            if (
+                not closed
+                and registration.get("automatic_setup")
+                and hasattr(registrations.backend, "registration_preparation_status")
+                and registrations.backend.registration_preparation_status(registration_id)
+                in {"error", "failure"}
+            ):
+                return {
+                    "app_id": app_id,
+                    "registration_id": registration_id,
+                    "phase": "needs_attention",
+                    "actor": "Application and platform owners",
+                    "message": "Source, access or setup policy changed. Ask the platform owner "
+                    "to reconcile this registration before a fresh setup review. "
+                    "No deployment has started.",
+                    "registration": registration,
+                    "setup": None,
+                    "deployment": None,
+                }
             return {
                 "app_id": app_id,
                 "registration_id": registration_id,

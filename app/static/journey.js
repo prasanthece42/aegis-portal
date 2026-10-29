@@ -36,7 +36,7 @@ function renderOnboarding(data) {
   $("onboarding-actor").textContent = `Next action: ${data.actor}`;
   $("onboarding-observed").textContent = `Updated ${new Date().toLocaleTimeString()}. Progress refreshes automatically while you wait.`;
   const labels = ["Review & ownership", "Prepare", "Build", "Review release", "Deploy & health"];
-  const index = { owner_review: 0, setup_review: 1, preparing: 1, setup_approval: 1, building: 2, release_review: 3, deploying: 4, healthy: 5 }[data.phase] ?? 1;
+  const index = (!data.setup && data.registration) ? 0 : { owner_review: 0, setup_review: 1, preparing: 1, setup_approval: 1, building: 2, release_review: 3, deploying: 4, healthy: 5 }[data.phase] ?? 1;
   $("onboarding-stages").replaceChildren(...labels.map((label, i) => {
     const item = node("li", `${i < index ? "✓ " : `${i + 1}. `}${label}`, i < index ? "done" : i === index ? "current" : "");
     if (i === index) item.setAttribute("aria-current", "step"); return item;

@@ -57,6 +57,13 @@ class SetupGitHub:
         raw = self.journal("reg-" + setup_id[6:])
         return raw if raw and raw[1].get("payload", {}).get("setup_intent") else None
 
+    def registration_preparation_status(self, registration_id):
+        raw = self.journal(registration_id)
+        if not raw or not raw[1].get("payload", {}).get("setup_intent"):
+            return "unknown"
+        revision, delivery = self.catalog_snapshot()
+        return self.setup_job_evidence(raw[0], self.setup_policy(revision, delivery))
+
     def setup_policy_token(self):
         return self.installation_token(
             self.config.platform_installation_id,

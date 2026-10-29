@@ -23,7 +23,7 @@ def services(state="preparing", deployment=None, catalog="approved"):
         return deployment
 
     return (
-        SimpleNamespace(get=get_registration),
+        SimpleNamespace(get=get_registration, backend=SimpleNamespace()),
         SimpleNamespace(latest=latest_setup),
         SimpleNamespace(latest_for_app=latest_delivery),
     ), calls
@@ -121,3 +121,15 @@ def test_onboarding_route_requires_session_and_matching_owned_registration(confi
     )
     assert client.post("/auth/logout").status_code == 200
     assert client.get(path).status_code == 401
+
+
+def test_pending_journey_surfaces_trusted_worker_blocker_before_catalog_merge():
+    svc, calls = services(catalog="pending_review")
+    registration = svc[0].get()
+    registration["automatic_setup"] = True
+    svc[0].backend.registration_preparation_status = lambda _: "error"
+    calls.clear()
+    result = onboarding_status(None, "orders", "reg", *svc)
+    assert result["phase"] == "needs_attention"
+    assert "reconcile" in result["message"]
+    assert "setup" not in calls and "delivery" not in calls
