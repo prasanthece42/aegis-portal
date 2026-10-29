@@ -31,7 +31,16 @@ async function api(path, options = {}) {
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   if (state.session) headers["X-CSRF-Token"] = state.session.csrf_token;
   const response = await fetch(path, { credentials: "same-origin", ...options, headers });
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid response");
+  } catch {
+    if (response.status === 401 && state.session) {
+      state.session = null; show("sign-in"); renderIdentity();
+    }
+    throw new Error(`The portal could not complete the request (HTTP ${response.status}). Refresh and retry. If an operation was already confirmed, use its recovery action.`);
+  }
   if (!response.ok) {
     if (response.status === 401 && state.session) {
       state.session = null;

@@ -163,7 +163,7 @@ def create_app(
         if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 monitoring.policy()
-                _app.state.telemetry = Telemetry("aegis-portal", "0.5.0")
+                _app.state.telemetry = Telemetry("aegis-portal", "0.5.1")
                 backend.telemetry = _app.state.telemetry
             except PortalError:
                 pass  # The front door must remain available to repair monitoring.
@@ -177,7 +177,7 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.5.0", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.5.1", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
@@ -185,6 +185,23 @@ def create_app(
     app.state.monitoring, app.state.telemetry = monitoring, None
     app.add_middleware(RequestBoundary)
     app.add_middleware(TelemetryMiddleware, holder=app)
+
+    @app.exception_handler(Exception)
+    async def unexpected_error(_request, _exc):
+        return JSONResponse(
+            {
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": (
+                        "The portal could not complete the request. "
+                        "Retry safely or recover an already confirmed operation."
+                    ),
+                    "retryable": True,
+                    "correlation_id": secrets.token_hex(8),
+                }
+            },
+            status_code=500,
+        )
 
     @app.exception_handler(PortalError)
     async def portal_error(_request, exc):
@@ -303,7 +320,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.5.0",
+            "version": "0.5.1",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 

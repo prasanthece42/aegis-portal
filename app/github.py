@@ -180,6 +180,11 @@ class GitHub(OwnerGitHub, DeliveryGitHub, UploadGitHub):
         user = self.api("GET", "/user", token).json()
         return user, token, min(expires, 28800)
 
+    def validate_session(self, session: Session):
+        user = self.api("GET", "/user", session.user_token).json()
+        if str(user.get("id")) != session.user_id:
+            raise PortalError(401, "SIGN_IN_REQUIRED", "Sign in to continue.")
+
     def repositories(self, session: Session) -> list[dict]:
         result = []
         installations = self.paginate("/user/installations", session.user_token, "installations")
