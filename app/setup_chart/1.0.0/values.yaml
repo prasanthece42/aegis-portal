@@ -1,0 +1,18 @@
+# Illustrative defaults cannot identify a real release. Admission supplies exact image/source.
+appId: unconfigured
+environment: dev
+replicaCount: 1
+image:
+  repository: ghcr.io/example/unconfigured
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  pullPolicy: Never
+sourceCommit: '0000000000000000000000000000000000000000'
+containerPort: 8000
+healthPath: /health
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

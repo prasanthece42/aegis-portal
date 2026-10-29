@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "argo_namespace": "argocd",
+  "pod_security_version": "v1.35",
+  "resource_profiles": {
+    "small": {
+      "requests": {"cpu": "100m", "memory": "128Mi"},
+      "limits": {"cpu": "500m", "memory": "256Mi"},
+      "max_replicas": 2,
+      "quota": {
+        "pods": "3", "requests.cpu": "300m", "requests.memory": "384Mi",
+        "limits.cpu": "1500m", "limits.memory": "768Mi",
+        "services": "1", "count/deployments.apps": "1", "count/serviceaccounts": "2"
+      }
+    }
+  }
+}

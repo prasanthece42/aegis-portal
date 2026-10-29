@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "review_token": {
+      "maxLength": 16000,
+      "title": "Review Token",
+      "type": "string"
+    }
+  },
+  "required": [
+    "review_token"
+  ],
+  "title": "SetupConfirmation",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
