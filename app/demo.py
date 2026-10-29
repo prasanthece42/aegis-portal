@@ -57,7 +57,7 @@ class DemoBackend:
     def repositories(self, session: Session) -> list[dict]:
         if session.user_id != "1":
             return []
-        return [
+        return self.data.get("uploaded_repositories", []) + [
             {
                 "repository_id": "101",
                 "installation_id": "903",
@@ -72,6 +72,21 @@ class DemoBackend:
             },
         ]
 
+    def uploaded_repository(self, repository, files):
+        with self.lock:
+            items = self.data.setdefault("uploaded_repositories", [])
+            if not any(r["repository_id"] == repository["repository_id"] for r in items):
+                items.append(repository)
+            self.data.setdefault("uploaded_files", {})[repository["repository_id"]] = list(files)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self.path.with_suffix(".tmp")
+            with temporary.open("w") as handle:
+                os.chmod(temporary, 0o600)
+                json.dump(self.data, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+            temporary.replace(self.path)
+
     def source(self, session: Session, repository_id: str) -> dict:
         for repo in self.repositories(session):
             if repo["repository_id"] == repository_id:
@@ -84,6 +99,16 @@ class DemoBackend:
         raise PortalError(404, "REPOSITORY_UNAVAILABLE", "Repository is unavailable.")
 
     def detection(self, source: dict) -> dict:
+        paths = self.data.get("uploaded_files", {}).get(source["repository_id"])
+        if paths is not None:
+            return {
+                "source_commit": source["source_commit"],
+                "dockerfile_present": "Dockerfile" in paths,
+                "dependency_lock_present": "requirements.txt" in paths or "uv.lock" in paths,
+                "pipeline_file_present": False,
+                "pipeline_validated": False,
+                "message": "Demo upload inspection only. CI and DEV target setup remain required.",
+            }
         return {
             "source_commit": source["source_commit"],
             "dockerfile_present": True,
@@ -172,7 +197,9 @@ class DemoBackend:
 
     def journal_ids(self) -> list[str]:
         with self.lock:
-            return list(self.data)
+            return [
+                key for key in self.data if key not in {"uploaded_repositories", "uploaded_files"}
+            ]
 
     def close(self):
         pass

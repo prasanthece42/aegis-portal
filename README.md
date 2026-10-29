@@ -232,3 +232,8 @@ immutable application releases remain required for live end-to-end verification.
 log-to-trace navigation, environment switching during slow reads, DEV-only target selection,
 escaping, mobile layout and logout. It uses synthetic hello-aegis responses against an isolated
 demo, saves results under `.local/monitoring-qa/`, and never authenticates to live services.
+
+## ZIP upload onboarding
+
+Public Python web app ZIP uploads join the existing registration flow.
+See [live configuration and recovery](docs/zip-upload-onboarding.md).

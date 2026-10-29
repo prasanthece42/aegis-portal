@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
-from aegis_platform.portal_system import RUNTIME_CONTRACT
+from aegis_platform.portal_system import UPLOAD_RUNTIME_CONTRACT
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
@@ -15,7 +15,7 @@ from app.security import Signer
 
 
 def test_image_runtime_contract_matches_operator_manifest_contract():
-    assert json.loads(Path("app/portal-profile.json").read_text()) == RUNTIME_CONTRACT
+    assert json.loads(Path("app/portal-profile.json").read_text()) == UPLOAD_RUNTIME_CONTRACT
 
 
 @pytest.mark.parametrize("matches", [True, False])

@@ -12,3 +12,5 @@
 .pipeline-passed { color: #176c39; background: #e5f5eb; }
 .pipeline-failed { color: #9e2525; background: #fdeaea; }
 .pipeline-running { color: #1956a0; background: #eaf2ff; }
+
+#upload pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:480px;overflow:auto;font-size:12px}#upload li,#upload-state,#upload-exclusions,#upload-repository{overflow-wrap:anywhere}#upload .card{margin-bottom:20px}#upload details{margin:16px 0}#upload input[type=file]{max-width:100%}#upload button{margin-top:10px}

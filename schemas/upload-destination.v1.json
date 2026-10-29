@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
+      "title": "Name",
+      "type": "string"
+    },
+    "visibility": {
+      "default": "public",
+      "pattern": "^public$",
+      "title": "Visibility",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "Destination",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

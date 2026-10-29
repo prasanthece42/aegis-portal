@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const state = { status: null, session: null, repositories: [], preview: null, activeId: null, busy: false };
 let pipelineSelection = null;
 let pipelineGeneration = 0;
-const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring", "pipeline"];
+const sections = ["sign-in", "applications", "registration", "progress", "deployment", "delivery-progress", "platform", "workflow-review", "monitoring", "pipeline", "upload"];
 
 function node(tag, text, cls) {
   const element = document.createElement(tag);
@@ -28,7 +28,7 @@ function error(message) {
 }
 async function api(path, options = {}) {
   const headers = { ...(options.headers || {}) };
-  if (options.body) headers["Content-Type"] = "application/json";
+  if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   if (state.session) headers["X-CSRF-Token"] = state.session.csrf_token;
   const response = await fetch(path, { credentials: "same-origin", ...options, headers });
   const data = await response.json();
@@ -60,6 +60,7 @@ async function action(callback) {
 function renderIdentity() {
   $("nav-monitoring").hidden = !state.session;
   if (!state.session) {
+    if (typeof clearUpload === "function") clearUpload();
     pipelineGeneration++;
     pipelineSelection = null;
     $("pipeline-stages").replaceChildren();

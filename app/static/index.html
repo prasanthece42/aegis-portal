@@ -78,13 +78,25 @@
           <section id="trace-detail" class="card form-card" hidden><div class="section-label"><h2>Trace timeline</h2><button class="text-button" id="close-trace">Close trace</button></div><p id="trace-identity" class="mono"></p><div id="trace-spans"></div></section>
           <p class="muted">Application access is checked for every request. Tracing requires instrumentation; missing samples do not establish health. Local retention is bounded to 24 hours and storage capacity. Alerts stay inside the portal.</p>
         </section>
+        <section id="upload" hidden>
+          <div class="page-heading"><div><span class="eyebrow">APPLICATION ONBOARDING</span><h1>Upload a new app</h1><p>Inspect a Python web app ZIP, review its public GitHub destination, then continue registration.</p></div><span class="pill neutral">DEV first</span></div>
+          <p id="upload-mode" class="notice"></p>
+          <section class="card form-card"><h2>1. Choose and inspect your project</h2><p>ZIP only · 5 MiB compressed · 10 MiB expanded · 500 entries maximum. Source is inspected without executing it. Dependencies, Git history, local environment files and workflows are excluded.</p>
+            <label for="upload-file">Project ZIP</label><input id="upload-file" type="file" accept=".zip,application/zip"><button id="inspect-upload" class="secondary">Inspect ZIP</button><button id="recover-upload" class="text-button" hidden>Recover previous upload</button>
+            <p id="upload-state" role="status"></p><div id="upload-detection"></div><h3>Final file list</h3><ul id="upload-files"></ul><div id="upload-exclusions"></div>
+          </section>
+          <form id="upload-destination" class="card form-card" hidden><h2>2. Choose GitHub destination</h2><label for="upload-org">GitHub destination account</label><input id="upload-org" readonly><label for="upload-name">Repository name</label><input id="upload-name" required maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,79}"><label for="upload-visibility">Visibility</label><select id="upload-visibility"><option value="public">Public</option></select><p>Repository creation requires account owner access and the approved GitHub App covering new repositories.</p><button class="secondary" type="submit">Review repository creation</button></form>
+          <section id="upload-review" class="card form-card" hidden><h2>3. Review and confirm creation</h2><p id="upload-review-target"></p><p>The final file list above is the source snapshot to upload. Creating this repository does not register or deploy the app.</p><button id="create-upload" class="primary">Create repository and upload</button></section>
+          <section id="upload-preparation" class="card form-card" hidden><h2>4. Prepare the app for our pipeline</h2><p id="upload-repository"></p><p>Confirm these runtime settings before reviewing proposed pipeline files.</p><form id="upload-settings"><label for="upload-app-id">Application ID</label><input id="upload-app-id" required minlength="3" maxlength="40" pattern="[a-z][a-z0-9]*(-[a-z0-9]+)*"><label for="upload-display">Application name</label><input id="upload-display" required maxlength="80"><label for="upload-port">Container port</label><input id="upload-port" type="number" min="1" max="65535" value="8000" required><label for="upload-health">Health endpoint</label><input id="upload-health" value="/health" required maxlength="200"><label for="upload-profile">Resource profile</label><select id="upload-profile"></select><p id="upload-profile-description"></p><button class="secondary" type="submit">Review pipeline files and requirements</button></form><div id="upload-proposals"></div><button id="upload-continue" class="primary" hidden>Continue into registration</button></section>
+          <div class="form-actions"><button id="upload-back" class="text-button">Back to existing repositories</button></div>
+        </section>
         <section id="registration" hidden>
           <div class="page-heading"><div><span class="eyebrow">APPLICATION ONBOARDING</span><h1>Register application</h1><p>A few settings. One reviewed configuration.</p></div><span class="pill neutral">DEV first</span></div>
           <ol class="stepper" aria-label="Registration steps"><li id="step-config" class="current">1 <span>Configure</span></li><li id="step-review">2 <span>Review</span></li><li id="step-submit">3 <span>Track setup</span></li></ol>
           <form id="registration-form">
             <div class="form-layout"><div class="form-main">
               <section class="card form-card"><div class="card-heading"><span class="number">01</span><div><h2>Repository & ownership</h2><p>Only repositories available to your identity and the platform appear here.</p></div></div>
-                <label for="repository">GitHub repository</label><select id="repository" name="repository_id" required><option value="">Select a repository</option></select>
+                <div class="form-actions"><span>Select an existing GitHub repository</span><button type="button" class="secondary" id="open-upload">Upload a new app</button></div><label for="repository">GitHub repository</label><select id="repository" name="repository_id" required><option value="">Select a repository</option></select>
                 <div class="field-grid"><div><label for="display-name">Application name</label><input id="display-name" maxlength="80" placeholder="Orders API" required></div><div><label for="app-id">Application ID</label><input id="app-id" minlength="3" maxlength="40" pattern="[a-z][a-z0-9]*(-[a-z0-9]+)*" placeholder="orders-api" required><small>Stable identifier. Lowercase letters, numbers and hyphens.</small></div></div>
                 <label for="owner">Application owner</label><select id="owner" required></select><small>Ownership is verified by the backend.</small>
               </section>
@@ -124,5 +136,6 @@
       <footer>AEGIS PLATFORM <span>Authorized requests → Reviewed Git → Argo reconciliation</span></footer>
     </div>
   </div>
+<script src="/static/uploads.js" defer></script>
 </body>
 </html>

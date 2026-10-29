@@ -27,6 +27,7 @@ from app.monitoring import MonitoringService
 from app.registration import RegistrationService
 from app.security import Session, Sessions, Signer, strict_json
 from app.telemetry import Telemetry, TelemetryMiddleware
+from app.uploads import MAX_ZIP, Destination, UploadConfirmation, UploadService
 from app.workflows import WorkflowService, WorkflowSubmission
 
 STATIC = Path(__file__).parent / "static"
@@ -41,6 +42,8 @@ class RequestBoundary:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] in {"GET", "HEAD"}:
             return await self.app(scope, receive, send)
+        zip_upload = scope["method"] == "POST" and scope["path"] == "/api/v1/uploads"
+        limit = MAX_ZIP if zip_upload else 32768
         chunks, length = [], 0
         while True:
             message = await receive()
@@ -48,12 +51,14 @@ class RequestBoundary:
                 return
             chunk = message.get("body", b"")
             length += len(chunk)
-            if length > 32768:
+            if length > limit:
                 response = JSONResponse(
                     {
                         "error": {
                             "code": "BODY_TOO_LARGE",
-                            "message": "Request exceeds 32 KiB.",
+                            "message": "ZIP exceeds 5 MiB."
+                            if zip_upload
+                            else "Request exceeds 32 KiB.",
                             "retryable": False,
                         }
                     },
@@ -64,7 +69,7 @@ class RequestBoundary:
             if not message.get("more_body"):
                 break
         body = b"".join(chunks)
-        if body and scope["path"].startswith("/api/"):
+        if body and scope["path"].startswith("/api/") and not zip_upload:
             try:
                 strict_json(body)
             except (ValueError, UnicodeError):
@@ -130,12 +135,35 @@ def create_app(
     workflows = WorkflowService(backend, signer) if config else None
     monitoring = MonitoringService(backend) if config else None
 
+    uploads = (
+        UploadService(
+            config,
+            backend,
+            signer,
+            Path(
+                os.getenv(
+                    "AEGIS_UPLOAD_DATA",
+                    str(settings.demo_path.with_suffix(".uploads.sqlite3"))
+                    if settings.mode == "demo"
+                    else ".local/uploads.sqlite3",
+                )
+            ),
+            "demo"
+            if settings.mode == "demo"
+            else os.getenv("AEGIS_UPLOAD_OWNER", os.getenv("AEGIS_UPLOAD_ORGANIZATION", "")),
+            demo=settings.mode == "demo",
+            owner_type=os.getenv("AEGIS_UPLOAD_OWNER_TYPE", "Organization"),
+        )
+        if config
+        else None
+    )
+
     @asynccontextmanager
     async def lifespan(_app):
         if settings.mode == "live" and os.getenv("KUBERNETES_SERVICE_HOST"):
             try:
                 monitoring.policy()
-                _app.state.telemetry = Telemetry("aegis-portal", "0.4.1")
+                _app.state.telemetry = Telemetry("aegis-portal", "0.5.0")
                 backend.telemetry = _app.state.telemetry
             except PortalError:
                 pass  # The front door must remain available to repair monitoring.
@@ -149,10 +177,11 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.4.1", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.5.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
+    app.state.uploads = uploads
     app.state.monitoring, app.state.telemetry = monitoring, None
     app.add_middleware(RequestBoundary)
     app.add_middleware(TelemetryMiddleware, holder=app)
@@ -274,7 +303,7 @@ def create_app(
             "mode": settings.mode,
             "registration_enabled": service is not None,
             "deployment_enabled": bool(config and config.delivery_workflow_commit),
-            "version": "0.4.1",
+            "version": "0.5.0",
             "operator_preview": os.getenv("AEGIS_OPERATOR_PREVIEW") == "1",
         }
 
@@ -403,6 +432,51 @@ def create_app(
         session: Auth,
     ):
         return workflows.submit(session, repository, number, fields)
+
+    @app.get("/api/v1/upload-capabilities")
+    def upload_capabilities(session: Auth):
+        return uploads.capabilities(session)
+
+    @app.post("/api/v1/uploads", status_code=201)
+    async def inspect_upload(request: Request, session: Auth):
+        if request.headers.get("content-type", "").split(";")[0] != "application/zip":
+            raise PortalError(415, "ZIP_REQUIRED", "Upload a ZIP using application/zip.")
+        from starlette.concurrency import run_in_threadpool
+
+        return await run_in_threadpool(uploads.inspect, session, await request.body())
+
+    @app.get("/api/v1/uploads/{upload_id}")
+    def get_upload(upload_id: str, session: Auth):
+        return uploads.get(session, upload_id)
+
+    @app.delete("/api/v1/uploads/{upload_id}")
+    def remove_upload(upload_id: str, session: Auth):
+        return uploads.delete(session, upload_id)
+
+    @app.post("/api/v1/uploads/{upload_id}/review")
+    def review_upload(upload_id: str, fields: Destination, session: Auth):
+        return uploads.preview(session, upload_id, fields)
+
+    @app.post("/api/v1/uploads/{upload_id}/confirm")
+    def confirm_upload(upload_id: str, fields: UploadConfirmation, session: Auth):
+        return uploads.confirm(session, upload_id, fields.review_token)
+
+    @app.post("/api/v1/uploads/{upload_id}/resume")
+    def resume_upload(upload_id: str, session: Auth):
+        return uploads.resume(session, upload_id)
+
+    @app.post("/api/v1/uploads/{upload_id}/preparation")
+    def prepare_upload(upload_id: str, fields: RegistrationFields, session: Auth):
+        record = uploads.get(session, upload_id)
+        if (
+            record["status"] != "uploaded"
+            or record["repository"]["repository_id"] != fields.repository_id
+        ):
+            raise PortalError(409, "UPLOAD_NOT_READY", "Complete this repository upload first.")
+        service.authorize(session, fields)
+        from app.upload_preparation import preparation
+
+        return preparation(config, record, fields)
 
     @app.get("/api/v1/repositories")
     def repositories(session: Auth):
