@@ -44,6 +44,12 @@ def demo_config() -> LiveConfig:
                 "chart_version": "1.0.0",
                 "chart_sha256": "sha256:" + "c" * 64,
             },
+            "multiservice_versions": {
+                "workflow_commit": "a" * 40,
+                "helper_commit": "a" * 40,
+                "chart_version": "1.0.0",
+                "chart_sha256": "sha256:" + "e" * 64,
+            },
         }
     )
 
@@ -78,6 +84,12 @@ class DemoBackend:
             if not any(r["repository_id"] == repository["repository_id"] for r in items):
                 items.append(repository)
             self.data.setdefault("uploaded_files", {})[repository["repository_id"]] = list(files)
+            if "aegis-stack.json" in files:
+                import base64
+
+                self.data.setdefault("uploaded_stacks", {})[repository["repository_id"]] = (
+                    json.loads(base64.b64decode(files["aegis-stack.json"]))
+                )
             self.path.parent.mkdir(parents=True, exist_ok=True)
             temporary = self.path.with_suffix(".tmp")
             with temporary.open("w") as handle:
@@ -198,8 +210,18 @@ class DemoBackend:
     def journal_ids(self) -> list[str]:
         with self.lock:
             return [
-                key for key in self.data if key not in {"uploaded_repositories", "uploaded_files"}
+                key
+                for key in self.data
+                if key not in {"uploaded_repositories", "uploaded_files", "uploaded_stacks"}
             ]
 
     def close(self):
         pass
+
+    def stack_definition(self, source):
+        from aegis_platform.stack import StackDefinition
+
+        definitions = self.data.get("uploaded_stacks", {})
+        if source["repository_id"] not in definitions:
+            raise PortalError(422, "STACK_INVALID", "Upload a project containing aegis-stack.json.")
+        return StackDefinition.model_validate(definitions[source["repository_id"]]).model_dump()

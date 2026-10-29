@@ -195,6 +195,11 @@ async function previewDeployment() {
     ["Current desired state", context.expected_desired_fingerprint || "Initial deployment"]]) {
     $("deployment-review-details").append(node("dt", label), node("dd", value));
   }
+  if (context.components) {
+    $("deployment-review-details").append(node("dt", "Service images"), node("dd", Object.entries(context.components).map(([name,image]) => `${name}: ${image}`).join("; ")));
+    $("deployment-review-details").append(node("dt", "Runtime Secret"), node("dd", context.credentials_secret));
+    $("deployment-review-details").append(node("dt", "Environment configuration"), node("dd", JSON.stringify(context.environment)));
+  }
   $("deployment-confirm-note").textContent = preview.requires_human_approval
     ? "PROD requires independent human approval of the current PR head, then authorized operator sync."
     : preview.requires_operator_sync ? "The approved GitOps change requires authorized operator sync."
@@ -225,6 +230,12 @@ async function deliveryProgress(id) {
   $("delivery-progress-state").textContent = labels[result.status] || `Request ${result.status}.`;
   $("delivery-progress-observed").textContent = `Status observed ${new Date(result.status_observed_at).toLocaleString()}${result.health_observed_at ? ` · Health measured ${new Date(result.health_observed_at).toLocaleString()}` : " · Health has not been verified"}`;
   $("delivery-issue-link").replaceChildren();
+  if (result.components) {
+    const title = node("h3", "Service observations"), list = node("ul");
+    for (const component of result.components) list.append(node("li", `${component.name} · ${component.replicas} desired replica(s) · ${component.health.replaceAll("_", " ")}${component.observed_at ? ` · Last verified ${new Date(component.observed_at).toLocaleString()}` : ""}`));
+    $("delivery-issue-link").append(title, list);
+  }
+
   if (result.issue?.url) {
     const url = new URL(result.issue.url);
     if (url.origin === "https://github.com") {
@@ -274,6 +285,7 @@ async function registration() {
   $("owner").replaceChildren(...state.session.owner_choices.map((o) => new Option(o.label, o.user_id)));
   $("resource-profile").replaceChildren(...Object.keys(state.session.resource_profiles).map((id) => new Option(id, id)));
   profileDescription();
+  setRuntimeForm("", null);
   state.preview = null;
   $("registration-form").hidden = false; $("review").hidden = true;
   $("step-config").classList.add("current"); $("step-review").classList.remove("current");
@@ -284,22 +296,27 @@ function fields() {
   return {
     repository_id: $("repository").value, app_id: $("app-id").value,
     display_name: $("display-name").value, owner_user_ids: [$("owner").value],
-    runtime: { profile_id: "python312-web", container_port: Number($("port").value),
-      health_path: $("health-path").value, resource_profile_id: $("resource-profile").value }
+    runtime: runtimeFromForm("")
   };
 }
 function detail(label, value) {
   $("review-details").append(node("dt", label), node("dd", value));
 }
 async function validate() {
-  state.preview = await api("/api/v1/registration-validations?guided_setup=true", { method: "POST", body: JSON.stringify(fields()) });
+  state.preview = await api(`/api/v1/registration-validations?guided_setup=${$("runtime-profile").value === "python312-multiservice" ? "false" : "true"}`, { method: "POST", body: JSON.stringify(fields()) });
   const preview = state.preview;
   $("review-details").replaceChildren();
   $("review-title").textContent = `Review ${preview.fields.display_name}`;
   detail("Repository", preview.source.full_name);
   detail("Application ID", preview.fields.app_id);
   detail("Owner", state.session.login);
-  detail("Runtime", "Python 3.12 web app");
+  detail("Runtime", preview.fields.runtime.profile_id === "python312-multiservice" ? "Multi-service application" : "Python 3.12 web app");
+  if (preview.fields.runtime.stack) {
+    detail("Services", Object.keys(preview.fields.runtime.stack.services).join(", "));
+    detail("Dependencies", "Nginx · PostgreSQL · Redis · persistent storage");
+    detail("Credential reference", preview.fields.runtime.credentials_secret);
+    detail("Public environment overrides", JSON.stringify(preview.fields.runtime.environment));
+  }
   detail("Port / health", `${preview.fields.runtime.container_port} · ${preview.fields.runtime.health_path}`);
   detail("Resource profile", preview.fields.runtime.resource_profile_id);
   detail("Source revision", preview.source.source_commit);
@@ -614,3 +631,69 @@ $("delivery-pipeline").addEventListener("click", () => action(async () => {
 
 $("progress-prepare").addEventListener("click", () => action(() => setupView(state.progressApp)));
 $("progress-deploy").addEventListener("click", () => action(() => setupDeploy(state.progressApp)));
+
+const stackDefinitions = {};
+function runtimeField(prefix, field) {
+  return $(prefix ? prefix + ({port:"port", health:"health", profile:"profile", app:"app-id"}[field]) : ({port:"port",health:"health-path",profile:"resource-profile",app:"app-id"}[field]));
+}
+function renderStackForm(prefix, definition, environment = {}) {
+  stackDefinitions[prefix] = definition;
+  const details = $(prefix + "stack-details"), controls = $(prefix + "stack-environment");
+  details.replaceChildren(); controls.replaceChildren();
+  if (!definition) { details.append(node("p", "Load the service definition before continuing.")); return; }
+  details.append(node("h3", "Services and environment"));
+  for (const [name, service] of Object.entries(definition.services)) {
+    details.append(node("p", `${name} · ${service.replicas} replica(s) · port ${service.port} · ${service.health_path}`));
+    const group = node("fieldset"); group.append(node("legend", name));
+    for (const [key, value] of Object.entries(service.env)) {
+      const label = node("label", key), input = node("input");
+      input.value = environment[name]?.[key] ?? value; input.maxLength = 512;
+      input.dataset.service = name; input.dataset.environment = key;
+      label.append(input); group.append(label);
+    }
+    for (const [key, target] of Object.entries(service.service_env)) group.append(node("p", `${key} → ${target} (internal service URL)`));
+    for (const [key, ref] of Object.entries(service.secret_env)) group.append(node("p", `${key} → application runtime Secret / ${ref}`));
+    controls.append(group);
+  }
+  details.append(node("p", "Dependencies: private Nginx gateway, PostgreSQL and Redis; two persistent volumes. Actual credentials never enter this form."));
+}
+function setRuntimeForm(prefix, runtime) {
+  const selector = $(prefix + "runtime-profile");
+  const stackOption = selector.querySelector('option[value="python312-multiservice"]');
+  stackOption.disabled = !state.session?.runtime_profiles?.includes("python312-multiservice");
+  stackOption.textContent = stackOption.disabled ? "Multiple services (operator activation required)" : "Multiple services + database + gateway";
+  selector.value = runtime?.profile_id || "python312-web";
+  const multi = selector.value === "python312-multiservice";
+  $(prefix + "stack-configuration").hidden = !multi;
+  runtimeField(prefix,"port").readOnly = multi; runtimeField(prefix,"health").readOnly = multi;
+  runtimeField(prefix,"port").value = runtime?.container_port || (multi ? 8080 : 8000);
+  runtimeField(prefix,"health").value = runtime?.health_path || "/health";
+  renderStackForm(prefix, runtime?.stack || null, runtime?.environment || {});
+}
+function runtimeFromForm(prefix) {
+  const profile = $(prefix + "runtime-profile").value;
+  const runtime = {profile_id: profile, container_port: Number(runtimeField(prefix,"port").value), health_path: runtimeField(prefix,"health").value, resource_profile_id: runtimeField(prefix,"profile").value};
+  if (profile === "python312-multiservice") {
+    if (!stackDefinitions[prefix]) throw new Error("Load the services from aegis-stack.json first.");
+    runtime.stack = stackDefinitions[prefix]; runtime.credentials_secret = runtimeField(prefix,"app").value + "-runtime";
+    runtime.environment = {};
+    $(prefix + "stack-environment").querySelectorAll("input[data-environment]").forEach(input => {
+      (runtime.environment[input.dataset.service] ||= {})[input.dataset.environment] = input.value;
+    });
+  }
+  return runtime;
+}
+for (const prefix of ["", "upload-"]) {
+  $(prefix + "runtime-profile").addEventListener("change", () => {
+    const profile = $(prefix + "runtime-profile").value;
+    setRuntimeForm(prefix, {profile_id:profile, stack: prefix ? currentUpload?.detection?.stack : null});
+  });
+  $(prefix + "load-stack").addEventListener("click", () => action(async () => {
+    if (prefix && currentUpload?.detection?.stack) { renderStackForm(prefix, currentUpload.detection.stack); return; }
+    const repo = prefix ? currentUpload?.repository?.repository_id : $("repository").value;
+    if (!repo) throw new Error("Select a repository first.");
+    const result = await api(`/api/v1/repositories/${encodeURIComponent(repo)}/stack`);
+    renderStackForm(prefix, result.stack);
+  }));
+}
+$("repository").addEventListener("change", () => { renderStackForm("", null); state.preview = null; });

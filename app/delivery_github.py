@@ -14,7 +14,7 @@ from aegis_platform.delivery import (
     receipt_hash,
     verify_status,
 )
-from aegis_platform.release import ReleaseEvidence
+from aegis_platform.stack_release import parse_release
 
 from app.errors import PortalError
 
@@ -208,7 +208,7 @@ class DeliveryGitHub:
             raise PortalError(409, "RELEASE_INELIGIBLE", "Release receipt is missing or ambiguous.")
         raw = self.receipt_asset(source, assets[0]["id"], token)
         try:
-            evidence = ReleaseEvidence.model_validate(strict_json(raw))
+            evidence = parse_release(raw)
             run = self.api(
                 "GET",
                 f"/repos/{source}/actions/runs/{evidence.workflow_run_id}/attempts/{evidence.run_attempt}",
@@ -296,6 +296,18 @@ class DeliveryGitHub:
             statuses = self.paginate(
                 f"/repos/{repo}/commits/{current.intent_anchor}/statuses", token
             )
+            if entry.runtime.profile_id == "python312-multiservice":
+                from aegis_platform.stack_status import component_statuses
+
+                result["components"] = component_statuses(
+                    entry,
+                    intent["environment"],
+                    pointer["desired_state"],
+                    current,
+                    statuses,
+                    policy,
+                    datetime.now(UTC),
+                )
             try:
                 observation = verify_status(
                     statuses,
@@ -428,6 +440,11 @@ class DeliveryGitHub:
                 previous = self.current_intent(entry, prior_env, policy)
                 if not previous or previous.image_root_digest != evidence.image.rsplit("@", 1)[1]:
                     raise ValueError("Prior environment does not use the selected root image")
+                if (
+                    entry.runtime.profile_id == "python312-multiservice"
+                    and previous.release_evidence_hash != receipt_hash(raw)
+                ):
+                    raise ValueError("Prior environment must use the exact complete stack release")
                 observed = verify_status(
                     self.paginate(
                         f"/repos/{policy.gitops_repository}/commits/{previous.intent_anchor}/statuses",
@@ -468,6 +485,17 @@ class DeliveryGitHub:
             "expected_intent_anchor": current.intent_anchor if current else None,
             "prior_environment_evidence": prior,
             "target": target.model_dump(),
+            **(
+                {
+                    "components": {
+                        name: child.image for name, child in evidence.service_receipts().items()
+                    },
+                    "credentials_secret": entry.runtime.credentials_secret,
+                    "environment": entry.runtime.environment,
+                }
+                if entry.runtime.profile_id == "python312-multiservice"
+                else {}
+            ),
         }
 
     def delivery_issue(self, rid, record):

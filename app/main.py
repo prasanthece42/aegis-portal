@@ -179,7 +179,7 @@ def create_app(
             if backend:
                 backend.close()
 
-    app = FastAPI(title="Aegis Portal", version="0.7.1", lifespan=lifespan)
+    app = FastAPI(title="Aegis Portal", version="0.8.0", lifespan=lifespan)
     app.state.settings, app.state.sessions, app.state.service = settings, sessions, service
     app.state.delivery = delivery
     app.state.workflows = workflows
@@ -427,6 +427,8 @@ def create_app(
             "platform_owner_status": owner_status,
             "owner_choices": [{"user_id": session.user_id, "label": session.login}],
             "resource_profiles": config.model_dump()["resource_profiles"],
+            "runtime_profiles": ["python312-web"]
+            + (["python312-multiservice"] if config.multiservice_versions else []),
         }
 
     @app.get("/api/v1/platform/overview")
@@ -527,6 +529,13 @@ def create_app(
         from app.upload_preparation import preparation
 
         return preparation(config, record, fields)
+
+    @app.get("/api/v1/repositories/{repository_id}/stack")
+    def repository_stack(repository_id: str, session: Auth):
+        if session.user_id not in config.onboarding_user_ids:
+            raise PortalError(403, "ONBOARDING_FORBIDDEN", "Onboarding access is required.")
+        source = backend.source(session, repository_id)
+        return {"stack": backend.stack_definition(source), "source_commit": source["source_commit"]}
 
     @app.get("/api/v1/repositories")
     def repositories(session: Auth):

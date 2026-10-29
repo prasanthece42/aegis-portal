@@ -255,7 +255,9 @@ class GitHubTransport:
             )
         if path.endswith("/actions/runs"):
             return httpx.Response(200, json={"workflow_runs": []})
-        if path.endswith("/pulls") or path.endswith("/statuses") or path.endswith("/releases"):
+        if path.endswith("/status"):
+            return httpx.Response(200, json={"sha": path.split("/")[-2], "statuses": []})
+        if path.endswith("/pulls") or path.endswith("/releases"):
             return httpx.Response(200, json=[])
         raise AssertionError((method, path, kwargs))
 

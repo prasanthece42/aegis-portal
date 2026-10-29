@@ -248,3 +248,13 @@ separate. See [authority, operator service and recovery](docs/guided-dev-setup.m
 ## Guided onboarding
 
 New supported Python applications use one journey from combined registration/setup review to measured DEV health. See [the guided onboarding contract](docs/guided-onboarding.md). Owner reviews and deployment confirmation remain explicit; intermediate preparation, build and progress refresh are automatic.
+
+## Multi-service registration candidate (0.8.0)
+
+ZIP detection and existing-repository registration support a reviewed
+`aegis-stack.json`, public environment overrides, app-local Secret references,
+stack workflow proposals and component observations. Existing guided single-service
+onboarding and explicit preparation consent are preserved. The optional reviewed
+`multiservice_versions` configuration enables this profile; it stays disabled until
+its immutable platform/workflow/chart pins and operator target setup are activated.
+See [walkthrough and activation requirements](docs/multiservice.md).

@@ -4,15 +4,15 @@ requires-python = "==3.12.*"
 
 [[package]]
 name = "aegis-platform"
-version = "0.4.8"
-source = { path = "vendor/aegis_platform-0.4.8-py3-none-any.whl" }
+version = "0.5.1"
+source = { path = "vendor/aegis_platform-0.5.1-py3-none-any.whl" }
 dependencies = [
     { name = "cryptography" },
     { name = "pydantic" },
     { name = "rfc8785" },
 ]
 wheels = [
-    { filename = "aegis_platform-0.4.8-py3-none-any.whl", hash = "sha256:4e62cd9edb7963bd043a881af945883c4e731ff5d2fd387a3918d06c853ae372" },
+    { filename = "aegis_platform-0.5.1-py3-none-any.whl", hash = "sha256:91be008e4878c70614e10567e3571c9d88cff7c27e679513b40fc6998c4cec06" },
 ]
 
 [package.metadata]
@@ -24,7 +24,7 @@ requires-dist = [
 
 [[package]]
 name = "aegis-portal"
-version = "0.7.1"
+version = "0.8.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aegis-platform" },
@@ -44,7 +44,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aegis-platform", path = "vendor/aegis_platform-0.4.8-py3-none-any.whl" },
+    { name = "aegis-platform", path = "vendor/aegis_platform-0.5.1-py3-none-any.whl" },
     { name = "cryptography", specifier = ">=44,<50" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
